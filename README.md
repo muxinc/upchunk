@@ -61,10 +61,10 @@ module.exports = async (req, res) => {
 const picker = document.getElementById('picker');
 
 picker.onchange = () => {
-  const getUploadUrl = () => (
-    fetch('/the-endpoint-above')
-      .then(res => res.ok ? res.text() : throw new Error('Error getting an upload URL :('))
-  );
+  const getUploadUrl = () =>
+    fetch('/the-endpoint-above').then(res =>
+      res.ok ? res.text() : throw new Error('Error getting an upload URL :(')
+    );
 
   const upload = UpChunk.createUpload({
     endpoint: getUploadUrl,
@@ -82,7 +82,7 @@ picker.onchange = () => {
   });
 
   upload.on('finish', () => {
-    console.log("Wrap it up, we're done here. 👋');
+    console.log("Wrap it up, we're done here. 👋");
   });
 };
 ```
