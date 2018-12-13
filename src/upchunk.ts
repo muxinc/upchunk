@@ -60,7 +60,7 @@ export class UpChunk {
     this.eventTarget = new EventTarget();
 
     this.validateOptions();
-    this.getEndpoint().then(this.sendChunks);
+    this.getEndpoint().then(() => this.sendChunks());
 
     // restart sync when back online
     // trigger events when offline/back online
