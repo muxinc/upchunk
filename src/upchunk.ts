@@ -1,11 +1,23 @@
 import { EventTarget } from 'event-target-shim';
 
+const SUCCESSFUL_CHUNK_UPLOAD_CODES = [200, 201, 202, 204, 308];
+const TEMPORARY_ERROR_CODES = [408, 502, 503, 504]; // These error codes imply a chunk may be retried
+
+type EventName =
+  | 'attempt'
+  | 'attemptFailure'
+  | 'error'
+  | 'offline'
+  | 'online'
+  | 'progress'
+  | 'success';
+
 interface IOptions {
   endpoint: string | ((file?: File) => Promise<string>);
   file: File;
   headers?: Headers;
   chunkSize?: number;
-  retries?: number;
+  attempts?: number;
   delayBeforeRetry?: number;
 }
 
@@ -14,14 +26,15 @@ export class UpChunk {
   file: File;
   headers: Headers;
   chunkSize: number;
-  retries: number;
+  attempts: number;
   delayBeforeRetry: number;
 
   private chunk: Blob;
   private chunkCount: number;
   private chunkByteSize: number;
+  private endpointValue: string;
   private totalChunks: number;
-  private retriesCount: number;
+  private attemptCount: number;
   private offline: boolean;
   private paused: boolean;
 
@@ -33,13 +46,13 @@ export class UpChunk {
     this.file = options.file;
     this.headers = options.headers || ({} as Headers);
     this.chunkSize = options.chunkSize || 5120;
-    this.retries = options.retries || 5;
+    this.attempts = options.attempts || 5;
     this.delayBeforeRetry = options.delayBeforeRetry || 1;
 
     this.chunkCount = 0;
     this.chunkByteSize = this.chunkSize * 1024;
     this.totalChunks = Math.ceil(this.file.size / this.chunkByteSize);
-    this.retriesCount = 0;
+    this.attemptCount = 0;
     this.offline = false;
     this.paused = false;
 
@@ -47,7 +60,7 @@ export class UpChunk {
     this.eventTarget = new EventTarget();
 
     this.validateOptions();
-    this.sendChunks();
+    this.getEndpoint().then(this.sendChunks);
 
     // restart sync when back online
     // trigger events when offline/back online
@@ -55,21 +68,30 @@ export class UpChunk {
       if (!this.offline) return;
 
       this.offline = false;
-      this.eventTarget.dispatchEvent(new Event('online'));
+      this.dispatch('online');
       this.sendChunks();
     });
 
     window.addEventListener('offline', () => {
       this.offline = true;
-      this.eventTarget.dispatchEvent(new Event('offline'));
+      this.dispatch('offline');
     });
   }
 
   /**
    * Subscribe to an event
    */
-  public on(eType: string, fn: (event: Event) => void) {
-    this.eventTarget.addEventListener(eType, fn);
+  public on(eventName: EventName, fn: (event: Event) => void) {
+    this.eventTarget.addEventListener(eventName, fn);
+  }
+
+  /**
+   * Dispatch an event
+   */
+  private dispatch(eventName: EventName, detail?: any) {
+    const event = new CustomEvent(eventName, { detail });
+
+    this.eventTarget.dispatchEvent(event);
   }
 
   /**
@@ -96,7 +118,10 @@ export class UpChunk {
       throw new TypeError(
         'chunkSize must be a positive number in multiples of 256'
       );
-    if (this.retries && (typeof this.retries !== 'number' || this.retries <= 0))
+    if (
+      this.attempts &&
+      (typeof this.attempts !== 'number' || this.attempts <= 0)
+    )
       throw new TypeError('retries must be a positive number');
     if (
       this.delayBeforeRetry &&
@@ -110,9 +135,13 @@ export class UpChunk {
    */
   private getEndpoint() {
     if (typeof this.endpoint === 'string') {
+      this.endpointValue = this.endpoint;
       return Promise.resolve(this.endpoint);
     } else {
-      return this.endpoint(this.file);
+      return this.endpoint(this.file).then(value => {
+        this.endpointValue = value;
+        return this.endpointValue;
+      });
     }
   }
 
@@ -152,44 +181,40 @@ export class UpChunk {
       'Content-Range': `bytes ${rangeStart}-${rangeEnd}/${this.file.size}`,
     };
 
-    console.log({ headers, size: this.chunk.size });
+    this.dispatch('attempt', {
+      chunkNumber: this.chunkCount,
+      chunkSize: this.chunk.size,
+    });
 
-    return this.getEndpoint().then(endpoint =>
-      fetch(endpoint, {
-        headers,
-        method: 'PUT',
-        body: this.chunk,
-      })
-    );
+    return fetch(this.endpointValue, {
+      headers,
+      method: 'PUT',
+      body: this.chunk,
+    });
   }
 
   /**
    * Called on net failure. If retry counter !== 0, retry after delayBeforeRetry
    */
   private manageRetries() {
-    if (this.retriesCount++ < this.retries) {
+    if (this.attemptCount++ < this.attempts) {
       setTimeout(() => this.sendChunks(), this.delayBeforeRetry * 1000);
-      this.eventTarget.dispatchEvent(
-        new CustomEvent('fileRetry', {
-          detail: {
-            message: `An error occured uploading chunk ${
-              this.chunkCount
-            }. ${this.retries - this.retriesCount} retries left`,
-            chunk: this.chunkCount,
-            retriesLeft: this.retries - this.retriesCount,
-          },
-        })
-      );
+      this.dispatch('attemptFailure', {
+        message: `An error occured uploading chunk ${this.chunkCount}. ${this
+          .attempts - this.attemptCount} retries left.`,
+        chunkNumber: this.chunkCount,
+        attemptsLeft: this.attempts - this.attemptCount,
+      });
       return;
     }
 
-    this.eventTarget.dispatchEvent(
-      new CustomEvent('error', {
-        detail: `An error occured uploading chunk ${
-          this.chunkCount
-        }. No more retries, stopping upload`,
-      })
-    );
+    this.dispatch('error', {
+      message: `An error occured uploading chunk ${
+        this.chunkCount
+      }. No more retries, stopping upload`,
+      chunk: this.chunkCount,
+      attempts: this.attemptCount,
+    });
   }
 
   /**
@@ -202,34 +227,29 @@ export class UpChunk {
     this.getChunk()
       .then(() => this.sendChunk())
       .then(res => {
-        if (
-          res.status === 308 ||
-          res.status === 200 ||
-          res.status === 201 ||
-          res.status === 204
-        ) {
+        if (SUCCESSFUL_CHUNK_UPLOAD_CODES.includes(res.status)) {
           if (++this.chunkCount < this.totalChunks) this.sendChunks();
-          else this.eventTarget.dispatchEvent(new Event('finish'));
+          else this.dispatch('success');
 
           const percentProgress = Math.round(
             (100 / this.totalChunks) * this.chunkCount
           );
-          this.eventTarget.dispatchEvent(
-            new CustomEvent('progress', { detail: percentProgress })
-          );
+
+          this.dispatch('progress', percentProgress);
         }
 
         // errors that might be temporary, wait a bit then retry
-        else if ([408, 502, 503, 504].includes(res.status)) {
+        else if (TEMPORARY_ERROR_CODES.includes(res.status)) {
           if (this.paused || this.offline) return;
           this.manageRetries();
         } else {
           if (this.paused || this.offline) return;
-          this.eventTarget.dispatchEvent(
-            new CustomEvent('error', {
-              detail: `Server responded with ${res.status}. Stopping upload`,
-            })
-          );
+
+          this.dispatch('error', {
+            message: `Server responded with ${res.status}. Stopping upload.`,
+            chunkNumber: this.chunkCount,
+            attempts: this.attemptCount,
+          });
         }
       })
       .catch(err => {

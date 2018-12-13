@@ -87,53 +87,79 @@ picker.onchange = () => {
 };
 ```
 
-## Options Object
+## API
 
-- ### `endpoint` <small>required</small>
+### `createUpload(options)`
 
-  `string` | `function`
+Returns an instance of `UpChunk` and begins uploading the specified `File`.
+
+#### `options` object parameters
+
+- `endpoint` <small>type: `string` | `function` (required)</small>
 
   URL to upload the file to. This can be either a string of the authenticated URL to upload to, or a function that returns a promise that resolves that URL string. The function will be passed the `file` as a parameter.
 
-- ### `file` <small>required</small>
-
-  [`File`](https://developer.mozilla.org/en-US/docs/Web/API/File)
+- `file` <small>type: [`File`](https://developer.mozilla.org/en-US/docs/Web/API/File) (required)</small>
 
   The file you'd like to upload. For example, you might just want to use the file from an input with a type of "file".
 
-- ### `headers`
-
-  `object`
+- `headers` <small>type: `Object`</small>
 
   An object with any headers you'd like included with the `PUT` request for each chunk.
 
-- ### `chunkSize`
-
-  `integer` default: `5120`
+- `chunkSize` <small>type: `integer`, default:`5120`</small>
 
   The size in kb of the chunks to split the file into, with the exception of the final chunk which may be smaller. This parameter should be in multiples of 256.
 
-- ### `retries`
-
-  `integer` default: `5`
+- `retries` <small>type: `integer`, default: `5`</small>
 
   The number of times to retry any given chunk.
 
-- ### `delayBeforeRetry`
-
-  `integer` default: `1`
+- `delayBeforeRetry` <small>type: `integer`, default: `1`</small>
 
   The time in seconds to wait before attempting to upload a chunk again.
 
-## Methods
+### UpChunk Instance Methods
 
-### `pause`
+- `pause()`
 
-Pauses an upload after the current in-flight chunk is finished uploading.
+  Pauses an upload after the current in-flight chunk is finished uploading.
 
-### `resume`
+- `resume()`
 
-Resumes an upload that was previously paused.
+  Resumes an upload that was previously paused.
+
+### UpChunk Instance Events
+
+Events are fired with a [`CustomEvent`](https://developer.mozilla.org/en-US/docs/Web/API/CustomEvent/CustomEvent) object. The `detail` key is null if an interface isn't specified.
+
+- `attempt` <small>`{ detail: { chunkNumber: Integer, chunkSize: Integer } }`</small>
+
+  Fired immediately before a chunk upload is attempted. `chunkNumber` is the number of the current chunk being attempted, and `chunkSize` is the size (in bytes) of that chunk.
+
+- `attemptFailure` <small>`{ detail: { message: String, chunkNumber: Integer, attemptsLeft: Integer } }`</small>
+
+  Fired when an attempt to upload a chunk fails.
+
+- `error` <small>`{ detail: { message: String, chunkNumber: Integer, attempts: Integer } }`</small>
+
+  Fired when a chunk has reached the max number of retries or the response code is fatal and implies that retries should not be attempted.
+
+- `offline`
+
+  Fired when the client has gone offline.
+
+- `online`
+
+  Fired when the client has gone online.
+
+- `progress` <small>`{ detail: [0..100] }`</small>
+
+  Fired after successful chunk uploads and returns the current percentage of the file that's been uploaded (in terms of chunks).
+
+- `success`
+
+  Fired when the upload is
 
 ## Credit
 
