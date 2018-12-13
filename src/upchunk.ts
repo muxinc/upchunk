@@ -18,7 +18,7 @@ interface IOptions {
   headers?: Headers;
   chunkSize?: number;
   attempts?: number;
-  delayBeforeRetry?: number;
+  delayBeforeAttempt?: number;
 }
 
 export class UpChunk {
@@ -27,7 +27,7 @@ export class UpChunk {
   headers: Headers;
   chunkSize: number;
   attempts: number;
-  delayBeforeRetry: number;
+  delayBeforeAttempt: number;
 
   private chunk: Blob;
   private chunkCount: number;
@@ -47,7 +47,7 @@ export class UpChunk {
     this.headers = options.headers || ({} as Headers);
     this.chunkSize = options.chunkSize || 5120;
     this.attempts = options.attempts || 5;
-    this.delayBeforeRetry = options.delayBeforeRetry || 1;
+    this.delayBeforeAttempt = options.delayBeforeAttempt || 1;
 
     this.chunkCount = 0;
     this.chunkByteSize = this.chunkSize * 1024;
@@ -124,10 +124,11 @@ export class UpChunk {
     )
       throw new TypeError('retries must be a positive number');
     if (
-      this.delayBeforeRetry &&
-      (typeof this.delayBeforeRetry !== 'number' || this.delayBeforeRetry < 0)
+      this.delayBeforeAttempt &&
+      (typeof this.delayBeforeAttempt !== 'number' ||
+        this.delayBeforeAttempt < 0)
     )
-      throw new TypeError('delayBeforeRetry must be a positive number');
+      throw new TypeError('delayBeforeAttempt must be a positive number');
   }
 
   /**
@@ -194,11 +195,11 @@ export class UpChunk {
   }
 
   /**
-   * Called on net failure. If retry counter !== 0, retry after delayBeforeRetry
+   * Called on net failure. If retry counter !== 0, retry after delayBeforeAttempt
    */
   private manageRetries() {
     if (this.attemptCount++ < this.attempts) {
-      setTimeout(() => this.sendChunks(), this.delayBeforeRetry * 1000);
+      setTimeout(() => this.sendChunks(), this.delayBeforeAttempt * 1000);
       this.dispatch('attemptFailure', {
         message: `An error occured uploading chunk ${this.chunkCount}. ${this
           .attempts - this.attemptCount} retries left.`,
