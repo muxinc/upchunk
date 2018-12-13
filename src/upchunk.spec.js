@@ -19,8 +19,8 @@ describe('option validation', () => {
     file: fakeFile(),
     headers: {},
     chunkSize: 256,
-    retries: 1,
-    delayBeforeRetry: 1,
+    attempts: 1,
+    delayBeforeAttempt: 1,
     ...options,
   });
 
@@ -85,20 +85,20 @@ describe('option validation', () => {
       expect(() => createUpload(params)).toThrow(TypeError);
     });
 
-    test('retries is not a number', () => {
-      const params = buildParams({ retries: 'foo' });
+    test('attempts is not a number', () => {
+      const params = buildParams({ attempts: 'foo' });
 
       expect(() => createUpload(params)).toThrow(TypeError);
     });
 
-    test('retries is not a positive number', () => {
-      const params = buildParams({ retries: -1 });
+    test('attempts is not a positive number', () => {
+      const params = buildParams({ attempts: -1 });
 
       expect(() => createUpload(params)).toThrow(TypeError);
     });
 
-    test('delayBeforeRetries is not a positive number', () => {
-      const params = buildParams({ retries: -1 });
+    test('delayBeforeAttempt is not a positive number', () => {
+      const params = buildParams({ delayBeforeAttempt: -1 });
 
       expect(() => createUpload(params)).toThrow(TypeError);
     });

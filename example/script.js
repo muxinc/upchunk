@@ -11,14 +11,18 @@ picker.onchange = () => {
 
   // subscribe to events
   upload.on('error', err => {
-    console.error('Something bad happened', err.detail);
+    console.error('It all went wrong!', err.detail);
   });
 
-  upload.on('progress', progress => {
-    console.log(`The upload is at ${progress.detail}%`);
+  upload.on('progress', ({ detail: progress }) => {
+    console.log(`Progress: ${progress}%`);
   });
 
-  upload.on('finish', () => {
-    console.log('yeahhh');
+  upload.on('attempt', ({ detail }) => {
+    console.log('There was an attempt!', detail);
+  });
+
+  upload.on('success', () => {
+    console.log('We did it!');
   });
 };
