@@ -1,4 +1,4 @@
-# UpChunk
+# UpChunk <img src="https://travis-ci.org/muxinc/upchunk.svg?branch=master" alt="Build Status">
 
 UpChunk uploads chunks of files! It's a JavaScript module for handling large file uploads via chunking and making a `put` request for each chunk with the correct range request headers. Uploads can be paused and resumed, they're fault tolerant,
 and it should work just about anywhere.
@@ -163,4 +163,4 @@ Events are fired with a [`CustomEvent`](https://developer.mozilla.org/en-US/docs
 
 ## Credit
 
-A lot of this original code came from the awesome [huge uploader](https://github.com/Buzut/huge-uploader) project, which is what you need if you're looking to do multipart form data uploads. 👏
+The original idea and base for this came from the awesome [huge uploader](https://github.com/Buzut/huge-uploader) project, which is what you need if you're looking to do multipart form data uploads. 👏
