@@ -2,7 +2,7 @@
   "name": "upchunk",
   "version": "1.0.0",
   "description": "Dead simple chunked file uploads using Fetch",
-  "main": "index.js",
+  "main": "dist/upchunk.js",
   "repository": "https://github.com/muxinc/upchunk",
   "author": "Matthew McClure <m@mux.com>",
   "license": "MIT",
