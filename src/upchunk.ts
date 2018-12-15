@@ -22,12 +22,12 @@ interface IOptions {
 }
 
 export class UpChunk {
-  endpoint: string | ((file?: File) => Promise<string>);
-  file: File;
-  headers: Headers;
-  chunkSize: number;
-  attempts: number;
-  delayBeforeAttempt: number;
+  public endpoint: string | ((file?: File) => Promise<string>);
+  public file: File;
+  public headers: Headers;
+  public chunkSize: number;
+  public attempts: number;
+  public delayBeforeAttempt: number;
 
   private chunk: Blob;
   private chunkCount: number;
@@ -65,7 +65,9 @@ export class UpChunk {
     // restart sync when back online
     // trigger events when offline/back online
     window.addEventListener('online', () => {
-      if (!this.offline) return;
+      if (!this.offline) {
+        return;
+      }
 
       this.offline = false;
       this.dispatch('online');
@@ -85,6 +87,18 @@ export class UpChunk {
     this.eventTarget.addEventListener(eventName, fn);
   }
 
+  public pause() {
+    this.paused = true;
+  }
+
+  public resume() {
+    if (this.paused) {
+      this.paused = false;
+
+      this.sendChunks();
+    }
+  }
+
   /**
    * Dispatch an event
    */
@@ -101,34 +115,40 @@ export class UpChunk {
     if (
       !this.endpoint ||
       (typeof this.endpoint !== 'function' && typeof this.endpoint !== 'string')
-    )
+    ) {
       throw new TypeError(
         'endpoint must be defined as a string or a function that returns a promise'
       );
-    if (this.file instanceof File === false)
+    }
+    if (!(this.file instanceof File)) {
       throw new TypeError('file must be a File object');
-    if (this.headers && typeof this.headers !== 'object')
+    }
+    if (this.headers && typeof this.headers !== 'object') {
       throw new TypeError('headers must be null or an object');
+    }
     if (
       this.chunkSize &&
       (typeof this.chunkSize !== 'number' ||
         this.chunkSize <= 0 ||
         this.chunkSize % 256 !== 0)
-    )
+    ) {
       throw new TypeError(
         'chunkSize must be a positive number in multiples of 256'
       );
+    }
     if (
       this.attempts &&
       (typeof this.attempts !== 'number' || this.attempts <= 0)
-    )
+    ) {
       throw new TypeError('retries must be a positive number');
+    }
     if (
       this.delayBeforeAttempt &&
       (typeof this.delayBeforeAttempt !== 'number' ||
         this.delayBeforeAttempt < 0)
-    )
+    ) {
       throw new TypeError('delayBeforeAttempt must be a positive number');
+    }
   }
 
   /**
@@ -138,12 +158,12 @@ export class UpChunk {
     if (typeof this.endpoint === 'string') {
       this.endpointValue = this.endpoint;
       return Promise.resolve(this.endpoint);
-    } else {
-      return this.endpoint(this.file).then(value => {
-        this.endpointValue = value;
-        return this.endpointValue;
-      });
     }
+
+    return this.endpoint(this.file).then(value => {
+      this.endpointValue = value;
+      return this.endpointValue;
+    });
   }
 
   /**
@@ -198,7 +218,8 @@ export class UpChunk {
    * Called on net failure. If retry counter !== 0, retry after delayBeforeAttempt
    */
   private manageRetries() {
-    if (this.attemptCount++ < this.attempts) {
+    if (this.attemptCount < this.attempts) {
+      this.attemptCount = this.attemptCount + 1;
       setTimeout(() => this.sendChunks(), this.delayBeforeAttempt * 1000);
       this.dispatch('attemptFailure', {
         message: `An error occured uploading chunk ${this.chunkCount}. ${this
@@ -223,28 +244,35 @@ export class UpChunk {
    * handle errors & retries and dispatch events
    */
   private sendChunks() {
-    if (this.paused || this.offline) return;
+    if (this.paused || this.offline) {
+      return;
+    }
 
     this.getChunk()
       .then(() => this.sendChunk())
       .then(res => {
         if (SUCCESSFUL_CHUNK_UPLOAD_CODES.includes(res.status)) {
-          if (++this.chunkCount < this.totalChunks) this.sendChunks();
-          else this.dispatch('success');
+          this.chunkCount = this.chunkCount + 1;
+          if (this.chunkCount < this.totalChunks) {
+            this.sendChunks();
+          } else {
+            this.dispatch('success');
+          }
 
           const percentProgress = Math.round(
             (100 / this.totalChunks) * this.chunkCount
           );
 
           this.dispatch('progress', percentProgress);
-        }
-
-        // errors that might be temporary, wait a bit then retry
-        else if (TEMPORARY_ERROR_CODES.includes(res.status)) {
-          if (this.paused || this.offline) return;
+        } else if (TEMPORARY_ERROR_CODES.includes(res.status)) {
+          if (this.paused || this.offline) {
+            return;
+          }
           this.manageRetries();
         } else {
-          if (this.paused || this.offline) return;
+          if (this.paused || this.offline) {
+            return;
+          }
 
           this.dispatch('error', {
             message: `Server responded with ${res.status}. Stopping upload.`,
@@ -254,23 +282,13 @@ export class UpChunk {
         }
       })
       .catch(err => {
-        if (this.paused || this.offline) return;
+        if (this.paused || this.offline) {
+          return;
+        }
 
         // this type of error can happen after network disconnection on CORS setup
         this.manageRetries();
       });
-  }
-
-  public pause() {
-    this.paused = true;
-  }
-
-  public resume() {
-    if (this.paused) {
-      this.paused = false;
-
-      this.sendChunks();
-    }
   }
 }
 
