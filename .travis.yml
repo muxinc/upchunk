@@ -1,9 +1,7 @@
 language: node_js
 cache: yarn
 
-after_success:
-  - yarn build
-  - yarn pack
+script: yarn build
 
 deploy:
   - provider: releases
