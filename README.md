@@ -81,7 +81,7 @@ picker.onchange = () => {
     console.log(`So far we've uploaded ${progress.detail}% of this file.`);
   });
 
-  upload.on('finish', () => {
+  upload.on('success', () => {
     console.log("Wrap it up, we're done here. 👋");
   });
 };
@@ -159,7 +159,7 @@ Events are fired with a [`CustomEvent`](https://developer.mozilla.org/en-US/docs
 
 - `success`
 
-  Fired when the upload is
+  Fired when the upload is finished successfully.
 
 ## Credit
 
