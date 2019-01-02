@@ -6,6 +6,16 @@
   "repository": "https://github.com/muxinc/upchunk",
   "author": "Matthew McClure <m@mux.com>",
   "license": "MIT",
+  "keywords": [
+    "browser upload",
+    "chunked upload",
+    "file uplooad",
+    "gcs upload",
+    "google cloud storage upload",
+    "large file upload",
+    "resumable",
+    "upload"
+  ],
   "files": [
     "dist",
     "src"
