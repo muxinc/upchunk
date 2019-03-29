@@ -83,7 +83,7 @@ export class UpChunk {
   /**
    * Subscribe to an event
    */
-  public on(eventName: EventName, fn: (event: Event) => void) {
+  public on(eventName: EventName, fn: (event: CustomEvent) => void) {
     this.eventTarget.addEventListener(eventName, fn);
   }
 
