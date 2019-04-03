@@ -1,3 +1,5 @@
+![UpChunk](banner.png)
+
 # UpChunk <img src="https://travis-ci.org/muxinc/upchunk.svg?branch=master" alt="Build Status">
 
 UpChunk uploads chunks of files! It's a JavaScript module for handling large file uploads via chunking and making a `put` request for each chunk with the correct range request headers. Uploads can be paused and resumed, they're fault tolerant,
