@@ -59,6 +59,8 @@ module.exports = async (req, res) => {
 ### Then, in the browser
 
 ```javascript
+import * as UpChunk from '@mux/upchunk';
+
 // Pretend you have an HTML page with an input like: <input id="picker" type="file" />
 const picker = document.getElementById('picker');
 
