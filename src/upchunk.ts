@@ -64,20 +64,22 @@ export class UpChunk {
 
     // restart sync when back online
     // trigger events when offline/back online
-    window.addEventListener('online', () => {
-      if (!this.offline) {
-        return;
-      }
+    if (typeof(window) !== 'undefined') {
+      window.addEventListener('online', () => {
+        if (!this.offline) {
+          return;
+        }
 
-      this.offline = false;
-      this.dispatch('online');
-      this.sendChunks();
-    });
+        this.offline = false;
+        this.dispatch('online');
+        this.sendChunks();
+      });
 
-    window.addEventListener('offline', () => {
-      this.offline = true;
-      this.dispatch('offline');
-    });
+      window.addEventListener('offline', () => {
+        this.offline = true;
+        this.dispatch('offline');
+      });
+    }
   }
 
   /**
