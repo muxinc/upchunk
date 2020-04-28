@@ -19,5 +19,6 @@ module.exports = {
     filename: 'upchunk.js',
     library: 'UpChunk',
     libraryTarget: 'umd',
+    globalObject: 'this',
   },
 };
