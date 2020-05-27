@@ -12,9 +12,14 @@ type EventName =
   | 'progress'
   | 'success';
 
+type AllowedMethods = 
+  | 'PUT'
+  | 'POST'
+
 interface IOptions {
   endpoint: string | ((file?: File) => Promise<string>);
   file: File;
+  method?: EventName;
   headers?: Headers;
   chunkSize?: number;
   attempts?: number;
@@ -24,6 +29,7 @@ interface IOptions {
 export class UpChunk {
   public endpoint: string | ((file?: File) => Promise<string>);
   public file: File;
+  public method: AllowedMethods;
   public headers: Headers;
   public chunkSize: number;
   public attempts: number;
@@ -44,6 +50,7 @@ export class UpChunk {
   constructor(options: IOptions) {
     this.endpoint = options.endpoint;
     this.file = options.file;
+    this.method = options.method || 'PUT';
     this.headers = options.headers || ({} as Headers);
     this.chunkSize = options.chunkSize || 5120;
     this.attempts = options.attempts || 5;
@@ -211,7 +218,7 @@ export class UpChunk {
 
     return fetch(this.endpointValue, {
       headers,
-      method: 'PUT',
+      method: this.method,
       body: this.chunk,
     });
   }
