@@ -12,10 +12,15 @@ type EventName =
   | 'online'
   | 'progress'
   | 'success';
+type AllowedMethods =
+  | 'PUT'
+  | 'POST'
+  | 'PATCH'
 
 export interface UpChunkOptions {
   endpoint: string | ((file?: File) => Promise<string>);
   file: File;
+  method?: AllowedMethods;
   headers?: XhrHeaders;
   chunkSize?: number;
   attempts?: number;
@@ -26,6 +31,7 @@ export class UpChunk {
   public endpoint: string | ((file?: File) => Promise<string>);
   public file: File;
   public headers: XhrHeaders;
+  public method: AllowedMethods;
   public chunkSize: number;
   public attempts: number;
   public delayBeforeAttempt: number;
@@ -46,6 +52,7 @@ export class UpChunk {
     this.endpoint = options.endpoint;
     this.file = options.file;
     this.headers = options.headers || ({} as XhrHeaders);
+    this.method = options.method || 'PUT';
     this.chunkSize = options.chunkSize || 5120;
     this.attempts = options.attempts || 5;
     this.delayBeforeAttempt = options.delayBeforeAttempt || 1;
@@ -232,7 +239,7 @@ export class UpChunk {
     return this.xhrPromise({
       headers,
       url: this.endpointValue,
-      method: 'PUT',
+      method: this.method,
       body: this.chunk,
     });
   }
