@@ -15,11 +15,12 @@ type EventName =
 type AllowedMethods = 
   | 'PUT'
   | 'POST'
+  | 'PATCH';
 
 interface IOptions {
   endpoint: string | ((file?: File) => Promise<string>);
   file: File;
-  method?: EventName;
+  method?: AllowedMethods;
   headers?: Headers;
   chunkSize?: number;
   attempts?: number;
