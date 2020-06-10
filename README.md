@@ -159,7 +159,7 @@ Events are fired with a [`CustomEvent`](https://developer.mozilla.org/en-US/docs
 
 - `progress` <small>`{ detail: [0..100] }`</small>
 
-  Fired after successful chunk uploads and returns the current percentage of the file that's been uploaded (in terms of chunks).
+  Fired continuously with incremental upload progress. This returns the current percentage of the file that's been uploaded.
 
 - `success`
 
