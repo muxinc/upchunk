@@ -29,7 +29,7 @@ yarn add @mux/upchunk
 ### Script Tags
 
 ```
-<script src="https://unpkg.com/@mux/upchunk@1"></script>
+<script src="https://unpkg.com/@mux/upchunk@2"></script>
 ```
 
 ## Basic Usage
