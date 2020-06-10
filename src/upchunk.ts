@@ -1,4 +1,5 @@
 import { EventTarget } from 'event-target-shim';
+import xhr, { XhrUrlConfig, XhrHeaders, XhrResponse } from 'xhr';
 
 const SUCCESSFUL_CHUNK_UPLOAD_CODES = [200, 201, 202, 204, 308];
 const TEMPORARY_ERROR_CODES = [408, 502, 503, 504]; // These error codes imply a chunk may be retried
@@ -15,7 +16,7 @@ type EventName =
 interface IOptions {
   endpoint: string | ((file?: File) => Promise<string>);
   file: File;
-  headers?: Headers;
+  headers?: XhrHeaders;
   chunkSize?: number;
   attempts?: number;
   delayBeforeAttempt?: number;
@@ -24,7 +25,7 @@ interface IOptions {
 export class UpChunk {
   public endpoint: string | ((file?: File) => Promise<string>);
   public file: File;
-  public headers: Headers;
+  public headers: XhrHeaders;
   public chunkSize: number;
   public attempts: number;
   public delayBeforeAttempt: number;
@@ -44,7 +45,7 @@ export class UpChunk {
   constructor(options: IOptions) {
     this.endpoint = options.endpoint;
     this.file = options.file;
-    this.headers = options.headers || ({} as Headers);
+    this.headers = options.headers || ({} as XhrHeaders);
     this.chunkSize = options.chunkSize || 5120;
     this.attempts = options.attempts || 5;
     this.delayBeforeAttempt = options.delayBeforeAttempt || 1;
@@ -162,7 +163,7 @@ export class UpChunk {
       return Promise.resolve(this.endpoint);
     }
 
-    return this.endpoint(this.file).then(value => {
+    return this.endpoint(this.file).then((value) => {
       this.endpointValue = value;
       return this.endpointValue;
     });
@@ -172,7 +173,7 @@ export class UpChunk {
    * Get portion of the file of x bytes corresponding to chunkSize
    */
   private getChunk() {
-    return new Promise(resolve => {
+    return new Promise((resolve) => {
       // Since we start with 0-chunkSize for the range, we need to subtract 1.
       const length =
         this.totalChunks === 1 ? this.file.size : this.chunkByteSize;
@@ -191,6 +192,26 @@ export class UpChunk {
     });
   }
 
+  private xhrPromise(options: XhrUrlConfig): Promise<XhrResponse> {
+    const beforeSend = (xhrObject: XMLHttpRequest) => {
+      xhrObject.upload.onprogress = (event: ProgressEvent) => {
+        const successfulPercentage = (100 / this.totalChunks) * this.chunkCount;
+        const chunkPercentage = (event.loaded / this.file.size) * 100;
+        this.dispatch('progress', successfulPercentage + chunkPercentage);
+      };
+    };
+
+    return new Promise((resolve, reject) => {
+      xhr({ ...options, beforeSend }, (err, resp) => {
+        if (err) {
+          return reject(err);
+        }
+
+        return resolve(resp);
+      });
+    });
+  }
+
   /**
    * Send chunk of the file with appropriate headers and add post parameters if it's last chunk
    */
@@ -200,7 +221,6 @@ export class UpChunk {
     const headers = {
       ...this.headers,
       'Content-Type': this.file.type,
-      'Content-Length': this.chunk.size,
       'Content-Range': `bytes ${rangeStart}-${rangeEnd}/${this.file.size}`,
     };
 
@@ -209,8 +229,9 @@ export class UpChunk {
       chunkSize: this.chunk.size,
     });
 
-    return fetch(this.endpointValue, {
+    return this.xhrPromise({
       headers,
+      url: this.endpointValue,
       method: 'PUT',
       body: this.chunk,
     });
@@ -224,8 +245,9 @@ export class UpChunk {
       this.attemptCount = this.attemptCount + 1;
       setTimeout(() => this.sendChunks(), this.delayBeforeAttempt * 1000);
       this.dispatch('attemptFailure', {
-        message: `An error occured uploading chunk ${this.chunkCount}. ${this
-          .attempts - this.attemptCount} retries left.`,
+        message: `An error occured uploading chunk ${this.chunkCount}. ${
+          this.attempts - this.attemptCount
+        } retries left.`,
         chunkNumber: this.chunkCount,
         attemptsLeft: this.attempts - this.attemptCount,
       });
@@ -233,9 +255,7 @@ export class UpChunk {
     }
 
     this.dispatch('error', {
-      message: `An error occured uploading chunk ${
-        this.chunkCount
-      }. No more retries, stopping upload`,
+      message: `An error occured uploading chunk ${this.chunkCount}. No more retries, stopping upload`,
       chunk: this.chunkCount,
       attempts: this.attemptCount,
     });
@@ -252,8 +272,8 @@ export class UpChunk {
 
     this.getChunk()
       .then(() => this.sendChunk())
-      .then(res => {
-        if (SUCCESSFUL_CHUNK_UPLOAD_CODES.includes(res.status)) {
+      .then((res) => {
+        if (SUCCESSFUL_CHUNK_UPLOAD_CODES.includes(res.statusCode)) {
           this.chunkCount = this.chunkCount + 1;
           if (this.chunkCount < this.totalChunks) {
             this.sendChunks();
@@ -266,7 +286,7 @@ export class UpChunk {
           );
 
           this.dispatch('progress', percentProgress);
-        } else if (TEMPORARY_ERROR_CODES.includes(res.status)) {
+        } else if (TEMPORARY_ERROR_CODES.includes(res.statusCode)) {
           if (this.paused || this.offline) {
             return;
           }
@@ -277,13 +297,13 @@ export class UpChunk {
           }
 
           this.dispatch('error', {
-            message: `Server responded with ${res.status}. Stopping upload.`,
+            message: `Server responded with ${res.statusCode}. Stopping upload.`,
             chunkNumber: this.chunkCount,
             attempts: this.attemptCount,
           });
         }
       })
-      .catch(err => {
+      .catch((err) => {
         if (this.paused || this.offline) {
           return;
         }

@@ -29,20 +29,24 @@
     "build": "yarn clean && yarn lint && yarn test && webpack --config webpack.prod.js && yarn pack"
   },
   "devDependencies": {
-    "@types/jest": "^23.3.10",
-    "jest": "^23.6.0",
-    "ts-jest": "^23.10.5",
-    "ts-loader": "^5.3.1",
-    "tslint": "^5.11.0",
-    "tslint-config-airbnb": "^5.11.1",
-    "tslint-config-prettier": "^1.17.0",
-    "typescript": "^3.2.2",
-    "webpack": "^4.27.1",
-    "webpack-cli": "^3.1.2",
-    "webpack-dev-server": "^3.1.10",
-    "webpack-merge": "^4.1.5"
+    "@types/jest": "^25.2.3",
+    "jest": "^26.0.1",
+    "ts-jest": "^26.1.0",
+    "ts-loader": "^7.0.5",
+    "tslint": "^6.1.2",
+    "tslint-config-airbnb": "^5.11.2",
+    "tslint-config-prettier": "^1.18.0",
+    "typescript": "^3.9.5",
+    "webpack": "^4.43.0",
+    "webpack-cli": "^3.3.11",
+    "webpack-dev-server": "^3.11.0",
+    "webpack-merge": "^4.2.2"
   },
   "dependencies": {
-    "event-target-shim": "^4.0.3"
+    "event-target-shim": "^4.0.3",
+    "xhr": "^2.5.0"
+  },
+  "volta": {
+    "node": "10.21.0"
   }
 }
