@@ -38,6 +38,7 @@ export class UpChunk {
   private attemptCount: number;
   private offline: boolean;
   private paused: boolean;
+  private success: boolean;
 
   private reader: FileReader;
   private eventTarget: EventTarget;
@@ -56,6 +57,7 @@ export class UpChunk {
     this.attemptCount = 0;
     this.offline = false;
     this.paused = false;
+    this.success = false;
 
     this.reader = new FileReader();
     this.eventTarget = new EventTarget();
@@ -266,7 +268,7 @@ export class UpChunk {
    * handle errors & retries and dispatch events
    */
   private sendChunks() {
-    if (this.paused || this.offline) {
+    if (this.paused || this.offline || this.success) {
       return;
     }
 
@@ -278,6 +280,7 @@ export class UpChunk {
           if (this.chunkCount < this.totalChunks) {
             this.sendChunks();
           } else {
+            this.success = true;
             this.dispatch('success');
           }
 
