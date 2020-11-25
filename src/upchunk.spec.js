@@ -1,6 +1,6 @@
 /**
  * This is more of an integration test. We can't test these in TS, because
- * our handy dandy typechecks will make it so we can't compile with  invalid
+ * our handy dandy typechecks will make it so we can't compile with invalid
  * parameters. We don't have that luxury in normal JS, however, so make sure
  * we still yell when we're supposed to.
  */
