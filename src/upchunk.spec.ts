@@ -2,12 +2,37 @@ import * as nock from 'nock';
 
 import { createUpload } from './upchunk';
 
+beforeEach(() => {
+  nock('https://example.com').options('/upload/endpoint').reply(200).persist();
+});
+
+afterEach(() => {
+  nock.restore();
+  nock.abortPendingRequests();
+  nock.cleanAll();
+  nock.enableNetConnect();
+  nock.emitter.removeAllListeners();
+  nock.activate();
+});
+
 // Just to go ahead and take care of all the inevitable options requests
-nock('https://example.com').options('/upload/endpoint').reply(200).persist();
+
+const createUploadFixture = (
+  testFileBytes: number = 524288,
+  chunkSizeKb: number = 256
+) => {
+  const file = new File([new ArrayBuffer(testFileBytes)], 'test.mp4');
+
+  return createUpload({
+    file,
+    endpoint: 'https://example.com/upload/endpoint',
+    chunkSize: chunkSizeKb,
+  });
+};
 
 test('a file is uploaded using the correct content-range headers', (done) => {
-  const fileBytes = 524288; // 512kb
-  const file = new File([new ArrayBuffer(fileBytes)], 'test.mp4');
+  const fileBytes = 524288;
+  const upload = createUploadFixture(fileBytes);
 
   const scopes = [
     nock('https://example.com')
@@ -23,12 +48,6 @@ test('a file is uploaded using the correct content-range headers', (done) => {
       .put('/upload/endpoint')
       .reply(200),
   ];
-
-  const upload = createUpload({
-    file,
-    endpoint: 'https://example.com/upload/endpoint',
-    chunkSize: 256,
-  });
 
   upload.on('error', (err) => {
     done(err);
@@ -46,16 +65,9 @@ test('a file is uploaded using the correct content-range headers', (done) => {
 });
 
 test('an error is thrown if a request does not complete', (done) => {
-  const fileBytes = 524288; // 512kb
-  const file = new File([new ArrayBuffer(fileBytes)], 'test.mp4');
-
   const scope = nock('https://example.com').put('/upload/endpoint').reply(500);
 
-  const upload = createUpload({
-    file,
-    endpoint: 'https://example.com/upload/endpoint',
-    chunkSize: 256,
-  });
+  const upload = createUploadFixture();
 
   upload.on('error', (err) => {
     done();
@@ -67,8 +79,6 @@ test('an error is thrown if a request does not complete', (done) => {
 });
 
 test('fires an attempt event before each attempt', (done) => {
-  const fileBytes = 524288; // 512kb
-  const file = new File([new ArrayBuffer(fileBytes)], 'test.mp4');
   let ATTEMPT_COUNT = 0;
   const MAX_ATTEMPTS = 2; // because we set the chunk size to 256kb, half of our file size in bytes.
 
@@ -78,11 +88,7 @@ test('fires an attempt event before each attempt', (done) => {
     .put('/upload/endpoint')
     .reply(200);
 
-  const upload = createUpload({
-    file,
-    endpoint: 'https://example.com/upload/endpoint',
-    chunkSize: 256,
-  });
+  const upload = createUploadFixture();
 
   upload.on('attempt', (err) => {
     ATTEMPT_COUNT += 1;
@@ -96,5 +102,45 @@ test('fires an attempt event before each attempt', (done) => {
         `Attempted ${ATTEMPT_COUNT} times and it should have been ${MAX_ATTEMPTS}`
       );
     }
+  });
+});
+
+test('a chunk failing to upload fires an attemptFailure event', (done) => {
+  const scope = nock('https://example.com').put('/upload/endpoint').reply(502);
+
+  const upload = createUploadFixture();
+
+  upload.on('attemptFailure', (err) => {
+    done();
+  });
+});
+
+/* Still need to figure this test out. Unclear if it's currently an issue with Nock or UpChunk. */
+test.skip('a single chunk failing is retried multiple times until successful', (done) => {
+  let ATTEMPT_FAILURES = 0;
+
+  nock('https://example.com')
+    .put('/upload/endpoint')
+    .times(2)
+    .reply(502)
+    .put('/upload/endpoint')
+    .twice()
+    .reply(200);
+
+  const upload = createUploadFixture();
+
+  upload.on('attemptFailure', (err) => {
+    console.log(err.detail);
+    ATTEMPT_FAILURES += 1;
+  });
+
+  upload.on('error', done);
+
+  upload.on('success', () => {
+    if (ATTEMPT_FAILURES === 2) {
+      done();
+    }
+
+    done(`Expected 3 attempt failures, received ${ATTEMPT_FAILURES}`);
   });
 });
