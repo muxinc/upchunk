@@ -12,7 +12,9 @@ afterEach(() => {
   nock.restore();
 });
 
-const createUploadFixture = (options?: Partial<UpChunkOptions>, specifiedFile?: File
+const createUploadFixture = (
+  options?: Partial<UpChunkOptions>,
+  specifiedFile?: File
 ) => {
   const file = specifiedFile || new File([new ArrayBuffer(524288)], 'test.mp4');
 
@@ -24,9 +26,42 @@ const createUploadFixture = (options?: Partial<UpChunkOptions>, specifiedFile?: 
   });
 };
 
+test('files can be uploading using POST', (done) => {
+  const scope = nock('https://example.com')
+    .post('/upload/endpoint')
+    .reply(200)
+    .persist();
+
+  const upload = createUploadFixture({
+    method: 'POST',
+  });
+
+  upload.on('success', () => {
+    done();
+  });
+});
+
+test('files can be uploading using PATCH', (done) => {
+  const scope = nock('https://example.com')
+    .patch('/upload/endpoint')
+    .reply(200)
+    .persist();
+
+  const upload = createUploadFixture({
+    method: 'PATCH',
+  });
+
+  upload.on('success', () => {
+    done();
+  });
+});
+
 test('a file is uploaded using the correct content-range headers', (done) => {
   const fileBytes = 524288;
-  const upload = createUploadFixture({}, new File([new ArrayBuffer(fileBytes)], 'test.mp4'));
+  const upload = createUploadFixture(
+    {},
+    new File([new ArrayBuffer(fileBytes)], 'test.mp4')
+  );
 
   const scopes = [
     nock('https://example.com')
@@ -135,7 +170,9 @@ test('a single chunk failing is retried multiple times until successful', (done)
       return done();
     }
 
-    done(`Expected ${FAILURES} attempt failures, received ${ATTEMPT_FAILURE_COUNT}`);
+    done(
+      `Expected ${FAILURES} attempt failures, received ${ATTEMPT_FAILURE_COUNT}`
+    );
   });
 });
 
