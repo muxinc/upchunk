@@ -45,7 +45,7 @@
   },
   "dependencies": {
     "event-target-shim": "^4.0.3",
-    "xhr": "https://github.com/naugtur/xhr#16c9ee3"
+    "xhr": "^2.6.0"
   },
   "volta": {
     "node": "10.21.0"
