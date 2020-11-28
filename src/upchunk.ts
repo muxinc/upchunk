@@ -12,24 +12,17 @@ type EventName =
   | 'online'
   | 'progress'
   | 'success';
+
 type AllowedMethods =
   | 'PUT'
   | 'POST'
-<<<<<<< HEAD
-  | 'PATCH'
-=======
   | 'PATCH';
->>>>>>> Build passing
 
 export interface UpChunkOptions {
   endpoint: string | ((file?: File) => Promise<string>);
   file: File;
   method?: AllowedMethods;
-<<<<<<< HEAD
   headers?: XhrHeaders;
-=======
-  headers?: Headers;
->>>>>>> Build passing
   chunkSize?: number;
   attempts?: number;
   delayBeforeAttempt?: number;
