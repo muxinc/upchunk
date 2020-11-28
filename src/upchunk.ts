@@ -13,7 +13,7 @@ type EventName =
   | 'progress'
   | 'success';
 
-interface IOptions {
+export interface UpChunkOptions {
   endpoint: string | ((file?: File) => Promise<string>);
   file: File;
   headers?: XhrHeaders;
@@ -42,7 +42,7 @@ export class UpChunk {
   private reader: FileReader;
   private eventTarget: EventTarget;
 
-  constructor(options: IOptions) {
+  constructor(options: UpChunkOptions) {
     this.endpoint = options.endpoint;
     this.file = options.file;
     this.headers = options.headers || ({} as XhrHeaders);
@@ -242,7 +242,6 @@ export class UpChunk {
    */
   private manageRetries() {
     if (this.attemptCount < this.attempts) {
-      this.attemptCount = this.attemptCount + 1;
       setTimeout(() => this.sendChunks(), this.delayBeforeAttempt * 1000);
       this.dispatch('attemptFailure', {
         message: `An error occured uploading chunk ${this.chunkCount}. ${
@@ -273,7 +272,10 @@ export class UpChunk {
     this.getChunk()
       .then(() => this.sendChunk())
       .then((res) => {
+        this.attemptCount = this.attemptCount + 1;
+
         if (SUCCESSFUL_CHUNK_UPLOAD_CODES.includes(res.statusCode)) {
+          this.attemptCount = 0;
           this.chunkCount = this.chunkCount + 1;
           if (this.chunkCount < this.totalChunks) {
             this.sendChunks();
@@ -314,4 +316,4 @@ export class UpChunk {
   }
 }
 
-export const createUpload = (options: IOptions) => new UpChunk(options);
+export const createUpload = (options: UpChunkOptions) => new UpChunk(options);

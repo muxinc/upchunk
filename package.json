@@ -31,6 +31,7 @@
   "devDependencies": {
     "@types/jest": "^25.2.3",
     "jest": "^26.6.3",
+    "nock": "^13.0.5",
     "ts-jest": "^26.1.0",
     "ts-loader": "^7.0.5",
     "tslint": "^6.1.2",
