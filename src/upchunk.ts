@@ -7,6 +7,7 @@ const TEMPORARY_ERROR_CODES = [408, 502, 503, 504]; // These error codes imply a
 type EventName =
   | 'attempt'
   | 'attemptFailure'
+  | 'chunkSuccess'
   | 'error'
   | 'offline'
   | 'online'
@@ -290,8 +291,15 @@ export class UpChunk {
         this.attemptCount = this.attemptCount + 1;
 
         if (SUCCESSFUL_CHUNK_UPLOAD_CODES.includes(res.statusCode)) {
+          this.dispatch('chunkSuccess', {
+            chunk: this.chunkCount,
+            attempts: this.attemptCount,
+            response: res,
+          });
+
           this.attemptCount = 0;
           this.chunkCount = this.chunkCount + 1;
+
           if (this.chunkCount < this.totalChunks) {
             this.sendChunks();
           } else {
