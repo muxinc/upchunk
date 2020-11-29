@@ -45,6 +45,7 @@ export class UpChunk {
   private attemptCount: number;
   private offline: boolean;
   private paused: boolean;
+  private currentXhr?: XMLHttpRequest;
 
   private reader: FileReader;
   private eventTarget: EventTarget;
@@ -96,6 +97,11 @@ export class UpChunk {
    */
   public on(eventName: EventName, fn: (event: CustomEvent) => void) {
     this.eventTarget.addEventListener(eventName, fn);
+  }
+
+  public abort() {
+    this.pause();
+    this.currentXhr?.abort();
   }
 
   public pause() {
@@ -210,7 +216,8 @@ export class UpChunk {
     };
 
     return new Promise((resolve, reject) => {
-      xhr({ ...options, beforeSend }, (err, resp) => {
+      this.currentXhr = xhr({ ...options, beforeSend }, (err, resp) => {
+        this.currentXhr = undefined;
         if (err) {
           return reject(err);
         }
