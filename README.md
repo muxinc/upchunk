@@ -123,6 +123,10 @@ Returns an instance of `UpChunk` and begins uploading the specified `File`.
 
   The time in seconds to wait before attempting to upload a chunk again.
 
+- `method` <small>type: `"PUT" | "PATCH" | "POST"`, default: `PUT`</small>
+
+  The HTTP method to use when uploading each chunk.
+
 ### UpChunk Instance Methods
 
 - `pause()`
