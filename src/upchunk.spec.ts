@@ -221,7 +221,7 @@ test('chunkSuccess event is fired after each successful upload', (done) => {
   });
 });
 
-test.only('abort pauses the upload and cancels the current XHR request', (done) => {
+test('abort pauses the upload and cancels the current XHR request', (done) => {
   /*
     This is hacky and I don't love it, but the gist is:
     - Set up a chunkSuccess callback listener
@@ -248,7 +248,7 @@ test.only('abort pauses the upload and cancels the current XHR request', (done) 
         expect(chunkSuccessCallback).toHaveBeenCalledTimes(0);
         done();
       }
-    }, 50);
+    }, 100);
   });
 
   upload.on('chunkSuccess', chunkSuccessCallback);
