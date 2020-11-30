@@ -248,7 +248,7 @@ test('abort pauses the upload and cancels the current XHR request', (done) => {
       expect(scope.isDone()).toBeTruthy();
       expect(chunkSuccessCallback).toHaveBeenCalledTimes(0);
       done();
-    }, 100);
+    }, 10);
   });
 
   // upload.on('chunkSuccess', chunkSuccessCallback);
