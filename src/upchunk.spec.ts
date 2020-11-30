@@ -10,6 +10,7 @@ beforeEach(() => {
 
 afterEach(() => {
   nock.restore();
+  nock.cleanAll();
 });
 
 const createUploadFixture = (
@@ -27,10 +28,10 @@ const createUploadFixture = (
 };
 
 test('files can be uploading using POST', (done) => {
-  const scope = nock('https://example.com')
+  nock('https://example.com')
     .post('/upload/endpoint')
+    .twice()
     .reply(200)
-    .persist();
 
   const upload = createUploadFixture({
     method: 'POST',
@@ -42,10 +43,10 @@ test('files can be uploading using POST', (done) => {
 });
 
 test('files can be uploading using PATCH', (done) => {
-  const scope = nock('https://example.com')
+  nock('https://example.com')
     .patch('/upload/endpoint')
-    .reply(200)
-    .persist();
+    .twice()
+    .reply(200);
 
   const upload = createUploadFixture({
     method: 'PATCH',
@@ -94,7 +95,7 @@ test('a file is uploaded using the correct content-range headers', (done) => {
 });
 
 test('an error is thrown if a request does not complete', (done) => {
-  const scope = nock('https://example.com').put('/upload/endpoint').reply(500);
+  nock('https://example.com').put('/upload/endpoint').reply(500);
 
   const upload = createUploadFixture();
 
@@ -135,7 +136,7 @@ test('fires an attempt event before each attempt', (done) => {
 });
 
 test('a chunk failing to upload fires an attemptFailure event', (done) => {
-  const scope = nock('https://example.com').put('/upload/endpoint').reply(502);
+  nock('https://example.com').put('/upload/endpoint').reply(502);
 
   const upload = createUploadFixture();
 
@@ -244,14 +245,14 @@ test('abort pauses the upload and cancels the current XHR request', (done) => {
 
   upload.on('attempt', (e) => {
     setTimeout(() => {
-      if (scope.isDone()) {
-        expect(chunkSuccessCallback).toHaveBeenCalledTimes(0);
-        done();
-      }
+      expect(scope.isDone()).toBeTruthy();
+      expect(chunkSuccessCallback).toHaveBeenCalledTimes(0);
+      done();
     }, 100);
   });
 
-  upload.on('chunkSuccess', chunkSuccessCallback);
+  // upload.on('chunkSuccess', chunkSuccessCallback);
+  upload.on('chunkSuccess', (e) => console.log(e.detail))
 
   upload.on('success', () => {
     done('Upload should not have successfully completed');
