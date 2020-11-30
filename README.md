@@ -149,6 +149,10 @@ Events are fired with a [`CustomEvent`](https://developer.mozilla.org/en-US/docs
 
   Fired when an attempt to upload a chunk fails.
 
+- `chunkSuccess` <small>`{ detail: { chunk: Integer, attempts: Integer, response: XhrResponse } }`</small>
+
+  Fired when an indvidual chunk is successfully uploaded.
+
 - `error` <small>`{ detail: { message: String, chunkNumber: Integer, attempts: Integer } }`</small>
 
   Fired when a chunk has reached the max number of retries or the response code is fatal and implies that retries should not be attempted.
