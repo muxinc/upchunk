@@ -1,6 +1,6 @@
 import * as nock from 'nock';
 
-import { createUpload, UpChunkOptions } from './upchunk';
+import { UpChunk, createUpload, UpChunkOptions } from './upchunk';
 
 beforeEach(() => {
   if (!nock.isActive()) {
@@ -10,6 +10,7 @@ beforeEach(() => {
 
 afterEach(() => {
   nock.restore();
+  nock.cleanAll();
 });
 
 const createUploadFixture = (
@@ -27,10 +28,10 @@ const createUploadFixture = (
 };
 
 test('files can be uploading using POST', (done) => {
-  const scope = nock('https://example.com')
+  nock('https://example.com')
     .post('/upload/endpoint')
+    .twice()
     .reply(200)
-    .persist();
 
   const upload = createUploadFixture({
     method: 'POST',
@@ -42,10 +43,10 @@ test('files can be uploading using POST', (done) => {
 });
 
 test('files can be uploading using PATCH', (done) => {
-  const scope = nock('https://example.com')
+  nock('https://example.com')
     .patch('/upload/endpoint')
-    .reply(200)
-    .persist();
+    .twice()
+    .reply(200);
 
   const upload = createUploadFixture({
     method: 'PATCH',
@@ -94,7 +95,7 @@ test('a file is uploaded using the correct content-range headers', (done) => {
 });
 
 test('an error is thrown if a request does not complete', (done) => {
-  const scope = nock('https://example.com').put('/upload/endpoint').reply(500);
+  nock('https://example.com').put('/upload/endpoint').reply(500);
 
   const upload = createUploadFixture();
 
@@ -111,7 +112,7 @@ test('fires an attempt event before each attempt', (done) => {
   let ATTEMPT_COUNT = 0;
   const MAX_ATTEMPTS = 2; // because we set the chunk size to 256kb, half of our file size in bytes.
 
-  const scope = nock('https://example.com')
+  nock('https://example.com')
     .put('/upload/endpoint')
     .reply(200)
     .put('/upload/endpoint')
@@ -135,7 +136,7 @@ test('fires an attempt event before each attempt', (done) => {
 });
 
 test('a chunk failing to upload fires an attemptFailure event', (done) => {
-  const scope = nock('https://example.com').put('/upload/endpoint').reply(502);
+  nock('https://example.com').put('/upload/endpoint').reply(502);
 
   const upload = createUploadFixture();
 
@@ -199,5 +200,61 @@ test('a single chunk failing the max number of times fails the upload', (done) =
 
   upload.on('success', () => {
     done(`Expected upload to fail due to failed attempts`);
+  });
+});
+
+test('chunkSuccess event is fired after each successful upload', (done) => {
+  nock('https://example.com')
+    .put('/upload/endpoint')
+    .reply(200)
+    .put('/upload/endpoint')
+    .reply(200);
+
+  const upload = createUploadFixture();
+
+  const successCallback = jest.fn();
+
+  upload.on('chunkSuccess', successCallback);
+
+  upload.on('success', () => {
+    expect(successCallback).toBeCalledTimes(2);
+    done();
+  });
+});
+
+test('abort pauses the upload and cancels the current XHR request', (done) => {
+  /*
+    This is hacky and I don't love it, but the gist is:
+    - Set up a chunkSuccess callback listener
+    - We abort the upload during the first request stub before responding
+    - In the attempt callback, we'll set a short timeout, where we check if the scope is done, meaning all the stubs have been called. If that's the case, make sure that chunkSuccess was never called.
+  */
+  let upload: UpChunk;
+
+  const scope = nock('https://example.com')
+    .put('/upload/endpoint')
+    .reply(() => {
+      upload.abort();
+
+      return [200, 'success'];
+    });
+
+  upload = createUploadFixture();
+
+  const chunkSuccessCallback = jest.fn();
+
+  upload.on('attempt', (e) => {
+    setTimeout(() => {
+      expect(scope.isDone()).toBeTruthy();
+      expect(chunkSuccessCallback).toHaveBeenCalledTimes(0);
+      done();
+    }, 10);
+  });
+
+  // upload.on('chunkSuccess', chunkSuccessCallback);
+  upload.on('chunkSuccess', (e) => console.log(e.detail))
+
+  upload.on('success', () => {
+    done('Upload should not have successfully completed');
   });
 });
