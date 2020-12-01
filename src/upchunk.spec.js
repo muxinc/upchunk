@@ -102,5 +102,11 @@ describe('option validation', () => {
 
       expect(() => createUpload(params)).toThrow(TypeError);
     });
+
+    test('an error is thrown if input file is larger than max', () => {
+      const params = buildParams({ maxFileSize: fakeFile().size - 1 });
+
+      expect(() => createUpload(params)).toThrow(Error);
+    });
   });
 });

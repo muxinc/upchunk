@@ -22,6 +22,7 @@ type AllowedMethods =
 export interface UpChunkOptions {
   endpoint: string | ((file?: File) => Promise<string>);
   file: File;
+  maxFileSize?: number;
   method?: AllowedMethods;
   headers?: XhrHeaders;
   chunkSize?: number;
@@ -41,6 +42,7 @@ export class UpChunk {
   private chunk: Blob;
   private chunkCount: number;
   private chunkByteSize: number;
+  private maxFileSize: number;
   private endpointValue: string;
   private totalChunks: number;
   private attemptCount: number;
@@ -60,6 +62,7 @@ export class UpChunk {
     this.attempts = options.attempts || 5;
     this.delayBeforeAttempt = options.delayBeforeAttempt || 1;
 
+    this.maxFileSize = options.maxFileSize || 2**30;
     this.chunkCount = 0;
     this.chunkByteSize = this.chunkSize * 1024;
     this.totalChunks = Math.ceil(this.file.size / this.chunkByteSize);
@@ -127,7 +130,7 @@ export class UpChunk {
   }
 
   /**
-   * Validate options and throw error if not of the right type
+   * Validate options and throw errors if not of the right type
    */
   private validateOptions() {
     if (
@@ -152,6 +155,11 @@ export class UpChunk {
     ) {
       throw new TypeError(
         'chunkSize must be a positive number in multiples of 256'
+      );
+    }
+    if (this.maxFileSize < this.file.size) {
+      throw new Error(
+        `file size exceeds configured maximum (${this.maxFileSize} < ${this.file.size})`
       );
     }
     if (
