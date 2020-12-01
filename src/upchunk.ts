@@ -3,7 +3,6 @@ import xhr, { XhrUrlConfig, XhrHeaders, XhrResponse } from 'xhr';
 
 const SUCCESSFUL_CHUNK_UPLOAD_CODES = [200, 201, 202, 204, 308];
 const TEMPORARY_ERROR_CODES = [408, 502, 503, 504]; // These error codes imply a chunk may be retried
-const DEFAULT_MAX_FILE_SIZE_KB = 2**20 // Default to 1GB max file size for upload
 
 type EventName =
   | 'attempt'
@@ -63,7 +62,7 @@ export class UpChunk {
     this.attempts = options.attempts || 5;
     this.delayBeforeAttempt = options.delayBeforeAttempt || 1;
 
-    this.maxFileBytes = (options.maxFileSize || DEFAULT_MAX_FILE_SIZE_KB) * 1024;
+    this.maxFileBytes = (options.maxFileSize || 0) * 1024;
     this.chunkCount = 0;
     this.chunkByteSize = this.chunkSize * 1024;
     this.totalChunks = Math.ceil(this.file.size / this.chunkByteSize);
@@ -158,9 +157,9 @@ export class UpChunk {
         'chunkSize must be a positive number in multiples of 256'
       );
     }
-    if (this.maxFileBytes < this.file.size) {
+    if (this.maxFileBytes > 0 && this.maxFileBytes < this.file.size) {
       throw new Error(
-        `file size exceeds configured maximum (${this.maxFileBytes} < ${this.file.size})`
+        `file size exceeds maximum (${this.file.size} > ${this.maxFileBytes})`
       );
     }
     if (

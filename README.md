@@ -115,7 +115,7 @@ Returns an instance of `UpChunk` and begins uploading the specified `File`.
 
   The size in kb of the chunks to split the file into, with the exception of the final chunk which may be smaller. This parameter should be in multiples of 256.
 
-- `maxFileSize` <small>type: `integer`, default:`1000000`</small>
+- `maxFileSize` <small>type: `integer`, default: N/A</small>
 
   The maximum size of the file in kb of the input file to be uploaded. The maximum size can technically be smaller than the chunk size, and in that case there would be exactly one chunk.
 
