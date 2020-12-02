@@ -1,6 +1,6 @@
 /**
  * This is more of an integration test. We can't test these in TS, because
- * our handy dandy typechecks will make it so we can't compile with  invalid
+ * our handy dandy typechecks will make it so we can't compile with invalid
  * parameters. We don't have that luxury in normal JS, however, so make sure
  * we still yell when we're supposed to.
  */
@@ -101,6 +101,12 @@ describe('option validation', () => {
       const params = buildParams({ delayBeforeAttempt: -1 });
 
       expect(() => createUpload(params)).toThrow(TypeError);
+    });
+
+    test('an error is thrown if input file is larger than max', () => {
+      const params = buildParams({ maxFileSize: (fakeFile().size - 1) / 1024 });
+
+      expect(() => createUpload(params)).toThrow(Error);
     });
   });
 });

@@ -1,4 +1,5 @@
 module.exports = {
+  testURL: 'https://example.com',
   roots: ['<rootDir>/src'],
   transform: {
     '^.+\\.tsx?$': 'ts-jest',

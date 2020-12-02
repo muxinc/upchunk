@@ -7,16 +7,24 @@ const TEMPORARY_ERROR_CODES = [408, 502, 503, 504]; // These error codes imply a
 type EventName =
   | 'attempt'
   | 'attemptFailure'
+  | 'chunkSuccess'
   | 'error'
   | 'offline'
   | 'online'
   | 'progress'
   | 'success';
 
-interface IOptions {
+type AllowedMethods =
+  | 'PUT'
+  | 'POST'
+  | 'PATCH';
+
+export interface UpChunkOptions {
   endpoint: string | ((file?: File) => Promise<string>);
   file: File;
+  method?: AllowedMethods;
   headers?: XhrHeaders;
+  maxFileSize?: number;
   chunkSize?: number;
   attempts?: number;
   delayBeforeAttempt?: number;
@@ -26,6 +34,7 @@ export class UpChunk {
   public endpoint: string | ((file?: File) => Promise<string>);
   public file: File;
   public headers: XhrHeaders;
+  public method: AllowedMethods;
   public chunkSize: number;
   public attempts: number;
   public delayBeforeAttempt: number;
@@ -33,24 +42,28 @@ export class UpChunk {
   private chunk: Blob;
   private chunkCount: number;
   private chunkByteSize: number;
+  private maxFileBytes: number;
   private endpointValue: string;
   private totalChunks: number;
   private attemptCount: number;
   private offline: boolean;
   private paused: boolean;
   private success: boolean;
+  private currentXhr?: XMLHttpRequest;
 
   private reader: FileReader;
   private eventTarget: EventTarget;
 
-  constructor(options: IOptions) {
+  constructor(options: UpChunkOptions) {
     this.endpoint = options.endpoint;
     this.file = options.file;
     this.headers = options.headers || ({} as XhrHeaders);
+    this.method = options.method || 'PUT';
     this.chunkSize = options.chunkSize || 5120;
     this.attempts = options.attempts || 5;
     this.delayBeforeAttempt = options.delayBeforeAttempt || 1;
 
+    this.maxFileBytes = (options.maxFileSize || 0) * 1024;
     this.chunkCount = 0;
     this.chunkByteSize = this.chunkSize * 1024;
     this.totalChunks = Math.ceil(this.file.size / this.chunkByteSize);
@@ -92,6 +105,11 @@ export class UpChunk {
     this.eventTarget.addEventListener(eventName, fn);
   }
 
+  public abort() {
+    this.pause();
+    this.currentXhr?.abort();
+  }
+
   public pause() {
     this.paused = true;
   }
@@ -114,7 +132,7 @@ export class UpChunk {
   }
 
   /**
-   * Validate options and throw error if not of the right type
+   * Validate options and throw errors if expectations are violated.
    */
   private validateOptions() {
     if (
@@ -139,6 +157,11 @@ export class UpChunk {
     ) {
       throw new TypeError(
         'chunkSize must be a positive number in multiples of 256'
+      );
+    }
+    if (this.maxFileBytes > 0 && this.maxFileBytes < this.file.size) {
+      throw new Error(
+        `file size exceeds maximum (${this.file.size} > ${this.maxFileBytes})`
       );
     }
     if (
@@ -204,7 +227,8 @@ export class UpChunk {
     };
 
     return new Promise((resolve, reject) => {
-      xhr({ ...options, beforeSend }, (err, resp) => {
+      this.currentXhr = xhr({ ...options, beforeSend }, (err, resp) => {
+        this.currentXhr = undefined;
         if (err) {
           return reject(err);
         }
@@ -234,7 +258,7 @@ export class UpChunk {
     return this.xhrPromise({
       headers,
       url: this.endpointValue,
-      method: 'PUT',
+      method: this.method,
       body: this.chunk,
     });
   }
@@ -244,7 +268,6 @@ export class UpChunk {
    */
   private manageRetries() {
     if (this.attemptCount < this.attempts) {
-      this.attemptCount = this.attemptCount + 1;
       setTimeout(() => this.sendChunks(), this.delayBeforeAttempt * 1000);
       this.dispatch('attemptFailure', {
         message: `An error occured uploading chunk ${this.chunkCount}. ${
@@ -275,8 +298,18 @@ export class UpChunk {
     this.getChunk()
       .then(() => this.sendChunk())
       .then((res) => {
+        this.attemptCount = this.attemptCount + 1;
+
         if (SUCCESSFUL_CHUNK_UPLOAD_CODES.includes(res.statusCode)) {
+          this.dispatch('chunkSuccess', {
+            chunk: this.chunkCount,
+            attempts: this.attemptCount,
+            response: res,
+          });
+
+          this.attemptCount = 0;
           this.chunkCount = this.chunkCount + 1;
+
           if (this.chunkCount < this.totalChunks) {
             this.sendChunks();
           } else {
@@ -317,4 +350,4 @@ export class UpChunk {
   }
 }
 
-export const createUpload = (options: IOptions) => new UpChunk(options);
+export const createUpload = (options: UpChunkOptions) => new UpChunk(options);

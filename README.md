@@ -1,6 +1,6 @@
 ![UpChunk](banner.png)
 
-# UpChunk <img src="https://travis-ci.org/muxinc/upchunk.svg?branch=master" alt="Build Status">
+# UpChunk <img src="https://github.com/muxinc/upchunk/workflows/CI/badge.svg" alt="Build Status">
 
 UpChunk uploads chunks of files! It's a JavaScript module for handling large file uploads via chunking and making a `put` request for each chunk with the correct range request headers. Uploads can be paused and resumed, they're fault tolerant,
 and it should work just about anywhere.
@@ -115,6 +115,10 @@ Returns an instance of `UpChunk` and begins uploading the specified `File`.
 
   The size in kb of the chunks to split the file into, with the exception of the final chunk which may be smaller. This parameter should be in multiples of 256.
 
+- `maxFileSize` <small>type: `integer`</small>
+
+  The maximum size of the file in kb of the input file to be uploaded. The maximum size can technically be smaller than the chunk size, and in that case there would be exactly one chunk.
+
 - `retries` <small>type: `integer`, default: `5`</small>
 
   The number of times to retry any given chunk.
@@ -122,6 +126,10 @@ Returns an instance of `UpChunk` and begins uploading the specified `File`.
 - `delayBeforeRetry` <small>type: `integer`, default: `1`</small>
 
   The time in seconds to wait before attempting to upload a chunk again.
+
+- `method` <small>type: `"PUT" | "PATCH" | "POST"`, default: `PUT`</small>
+
+  The HTTP method to use when uploading each chunk.
 
 ### UpChunk Instance Methods
 
@@ -144,6 +152,10 @@ Events are fired with a [`CustomEvent`](https://developer.mozilla.org/en-US/docs
 - `attemptFailure` <small>`{ detail: { message: String, chunkNumber: Integer, attemptsLeft: Integer } }`</small>
 
   Fired when an attempt to upload a chunk fails.
+
+- `chunkSuccess` <small>`{ detail: { chunk: Integer, attempts: Integer, response: XhrResponse } }`</small>
+
+  Fired when an indvidual chunk is successfully uploaded.
 
 - `error` <small>`{ detail: { message: String, chunkNumber: Integer, attempts: Integer } }`</small>
 
