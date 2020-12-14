@@ -220,9 +220,12 @@ export class UpChunk {
   private xhrPromise(options: XhrUrlConfig): Promise<XhrResponse> {
     const beforeSend = (xhrObject: XMLHttpRequest) => {
       xhrObject.upload.onprogress = (event: ProgressEvent) => {
-        const successfulPercentage = (100 / this.totalChunks) * this.chunkCount;
-        const chunkPercentage = (event.loaded / this.file.size) * 100;
-        this.dispatch('progress', successfulPercentage + chunkPercentage);
+        const percentagePerChunk = 100 / this.totalChunks;
+        const sizePerChunk = percentagePerChunk * this.file.size;
+        const successfulPercentage = percentagePerChunk * this.chunkCount;
+        const currentChunkProgress = event.loaded / (event.total ?? sizePerChunk);
+        const chunkPercentage = currentChunkProgress * percentagePerChunk;
+        this.dispatch('progress', Math.min(successfulPercentage + chunkPercentage, 100));
       };
     };
 
@@ -317,9 +320,10 @@ export class UpChunk {
             this.dispatch('success');
           }
 
-          const percentProgress = Math.round(
-            (100 / this.totalChunks) * this.chunkCount
-          );
+          const chunkFraction = this.chunkCount / this.totalChunks;
+          const uploadedBytes = chunkFraction * this.file.size;
+
+          const percentProgress = (100 * uploadedBytes) / this.file.size;
 
           this.dispatch('progress', percentProgress);
         } else if (TEMPORARY_ERROR_CODES.includes(res.statusCode)) {
