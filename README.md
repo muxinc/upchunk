@@ -180,3 +180,5 @@ Events are fired with a [`CustomEvent`](https://developer.mozilla.org/en-US/docs
 ## Credit
 
 The original idea and base for this came from the awesome [huge uploader](https://github.com/Buzut/huge-uploader) project, which is what you need if you're looking to do multipart form data uploads. 👏
+
+Also, @gabrielginter created a [Flutter package](https://github.com/gabrielginter/flutter-upchunk) for UpChunk!
