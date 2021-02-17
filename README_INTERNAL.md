@@ -1,10 +1,9 @@
 # Release
 
-1. Get branch approved and merged
-1. Pull the updated master branch locally
-1. Run `npm version` - bump the version appropriately (this will commit and tag master). ex: `npm version 1.0.8`
-1. Push commit to github w/ tags `git push origin --tags`
-1. Run `yarn build`
-1. Run `npm publish` (your npm account will need to have publish access)
-1. After publishing, there will be a release in github with this tagname. Edit the release notes with any changes and attach the `.tgz` file that was created by `yarn build`.
+1. Merge feature branches, bug fixes, and whatever changes into master after CI passes and PRs are approved
+2. Create a new branch off master when you're ready to release a new version
+3. Run `npm version` which will bump the version in `package.json` and make a tag (for example `npm version patch -m "Bump for 3.1.2"`). Follow SemVer rules for patch/minor/major.
+4. Push the version commit and the tag `git push` && `git push --tags origin`
+5. Open Pull Request, merge after approved
+6. Create a new release in the Github UI, give the release a name and add release notes (creating the release will kick off npm publish)
 
