@@ -222,6 +222,73 @@ test('chunkSuccess event is fired after each successful upload', (done) => {
   });
 });
 
+const isNumberArraySorted = (a: number[]): boolean => {
+  for (let i = 0; i < a.length - 1; i += 1) {
+    if (a[i] > a[i + 1]) {
+      return false;
+    }
+  }
+  return true;
+};
+
+test('progress event fires the correct upload percentage', (done) => {
+  const fileBytes = 1048576;
+  const upload = createUploadFixture(
+    {},
+    new File([new ArrayBuffer(fileBytes)], 'test.mp4')
+  );
+
+  const scopes = [
+    nock('https://example.com')
+      .matchHeader('content-range', `bytes 0-${fileBytes / 4 - 1}/${fileBytes}`)
+      .put('/upload/endpoint')
+      .reply(200),
+    nock('https://example.com')
+      .matchHeader(
+        'content-range',
+        `bytes ${fileBytes / 4}-${fileBytes / 2 - 1}/${fileBytes}`
+      )
+      .put('/upload/endpoint')
+      .reply(200),
+    nock('https://example.com')
+      .matchHeader(
+        'content-range',
+        `bytes ${fileBytes / 2}-${3 * fileBytes / 4 - 1}/${fileBytes}`
+      )
+      .put('/upload/endpoint')
+      .reply(200),
+    nock('https://example.com')
+      .matchHeader(
+        'content-range',
+        `bytes ${3 * fileBytes / 4}-${fileBytes - 1}/${fileBytes}`
+      )
+      .put('/upload/endpoint')
+      .reply(200),
+  ];
+
+  const progressCallback = jest.fn((percentage) => percentage);
+
+  upload.on('error', (err) => {
+    done(err);
+  });
+
+  upload.on('progress', (progress) => {
+    progressCallback(progress.detail);
+  });
+
+  upload.on('success', () => {
+    scopes.forEach((scope) => {
+      if (!scope.isDone()) {
+        done('All scopes not completed');
+      }
+    });
+    expect(progressCallback).toHaveBeenCalledTimes(7);
+    const progressPercentageArray = progressCallback.mock.calls.map(([percentage]) => percentage);
+    expect(isNumberArraySorted(progressPercentageArray)).toBeTruthy();
+    done();
+  });
+}, 10000);
+
 test('abort pauses the upload and cancels the current XHR request', (done) => {
   /*
     This is hacky and I don't love it, but the gist is:
