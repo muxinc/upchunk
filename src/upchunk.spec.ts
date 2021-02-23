@@ -299,7 +299,6 @@ test('abort pauses the upload and cancels the current XHR request', (done) => {
   */
   let upload: UpChunk;
   let attemptCt = 0;
-  const attemptCallback = jest.fn();
 
   const scope = nock('https://example.com')
     .put('/upload/endpoint')
@@ -307,6 +306,9 @@ test('abort pauses the upload and cancels the current XHR request', (done) => {
     .reply(200)
 
   upload = createUploadFixture();
+
+  const chunkSuccessCallback = jest.fn();
+
   upload.on('attempt', () => {
     attemptCt += 1;
     if (attemptCt === 1) {
@@ -321,7 +323,8 @@ test('abort pauses the upload and cancels the current XHR request', (done) => {
      * We set up 2 mocks for the upload endpoint, check that there is exactly 1
      * left that didn't fire after the upload was aborted
      */
-    expect(scope.activeMocks().length).toEqual(1)
+    expect(scope.activeMocks().length).toEqual(1);
+    expect(chunkSuccessCallback).toHaveBeenCalledTimes(0);
     done();
   }, 100);
 
