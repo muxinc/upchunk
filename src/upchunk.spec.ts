@@ -292,35 +292,52 @@ test('progress event fires the correct upload percentage', (done) => {
 test('abort pauses the upload and cancels the current XHR request', (done) => {
   /*
     This is hacky and I don't love it, but the gist is:
-    - Set up a chunkSuccess callback listener
-    - We abort the upload during the first request stub before responding
-    - In that reply callback, we'll check if the scope is done, meaning all the stubs have been called. If that's the case, make sure that chunkSuccess was never called and that the attempt handler was called exactly once.
+    - Set up a 'attempt' callback listener
+    - We abort the upload afterthe first attempt
+    - If we ever get past the first attempt, fail the test
+    - Give it 100ms and then check that the 1st upload request happened and the 2nd upload request did not happen
   */
   let upload: UpChunk;
-  let scope: nock.Scope;
+  let attemptCt = 0;
   const chunkSuccessCallback = jest.fn();
   const attemptCallback = jest.fn();
 
+  /*
   const checkComplete = () => {
-    expect(scope.isDone()).toBeTruthy();
-    expect(attemptCallback).toHaveBeenCalledTimes(1);
+    expect(scope.isDone()).toEqual(false);
+    // expect(attemptCallback).toHaveBeenCalledTimes(1);
     expect(chunkSuccessCallback).toHaveBeenCalledTimes(0);
     done();
   }
+  */
 
-  scope = nock('https://example.com')
+  const scope1 = nock('https://example.com')
     .put('/upload/endpoint')
     .reply(() => {
-      upload.abort();
+      return [200, 'success'];
+    })
 
-      checkComplete();
-
+  const scope2 = nock('https://example.com')
+    .put('/upload/endpoint')
+    .reply(() => {
       return [200, 'success'];
     });
 
   upload = createUploadFixture();
-  upload.on('chunkSuccess', chunkSuccessCallback);
-  upload.on('attempt', attemptCallback);
+  upload.on('attempt', () => {
+    attemptCt += 1;
+    if (attemptCt === 1) {
+      upload.abort();
+    } else {
+      done(`Error: never should have gotten past attempt 1. Currently attempting ${attemptCt}`);
+    }
+  });
+
+  setTimeout(() => {
+    expect(scope1.isDone()).toEqual(true);
+    expect(scope2.isDone()).toEqual(false);
+    done();
+  }, 100);
 
   upload.on('success', () => {
     done('Upload should not have successfully completed');
