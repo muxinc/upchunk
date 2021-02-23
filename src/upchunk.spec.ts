@@ -318,6 +318,8 @@ test('abort pauses the upload and cancels the current XHR request', (done) => {
     }
   });
 
+  upload.on('success', chunkSuccessCallback);
+
   setTimeout(() => {
     /*
      * We set up 2 mocks for the upload endpoint, check that there is exactly 1
@@ -328,7 +330,4 @@ test('abort pauses the upload and cancels the current XHR request', (done) => {
     done();
   }, 100);
 
-  upload.on('success', () => {
-    done('Upload should not have successfully completed');
-  });
 });
