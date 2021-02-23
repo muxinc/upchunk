@@ -294,36 +294,33 @@ test('abort pauses the upload and cancels the current XHR request', (done) => {
     This is hacky and I don't love it, but the gist is:
     - Set up a chunkSuccess callback listener
     - We abort the upload during the first request stub before responding
-    - In the attempt callback, we'll set a short timeout, where we check if the scope is done, meaning all the stubs have been called. If that's the case, make sure that chunkSuccess was never called.
+    - In that reply callback, we'll check if the scope is done, meaning all the stubs have been called. If that's the case, make sure that chunkSuccess was never called and that the attempt handler was called exactly once.
   */
   let upload: UpChunk;
+  let scope: nock.Scope;
+  const chunkSuccessCallback = jest.fn();
+  const attemptCallback = jest.fn();
 
-  const scope = nock('https://example.com')
+  const checkComplete = () => {
+    expect(scope.isDone()).toBeTruthy();
+    expect(attemptCallback).toHaveBeenCalledTimes(1);
+    expect(chunkSuccessCallback).toHaveBeenCalledTimes(0);
+    done();
+  }
+
+  scope = nock('https://example.com')
     .put('/upload/endpoint')
     .reply(() => {
       upload.abort();
+
+      checkComplete();
 
       return [200, 'success'];
     });
 
   upload = createUploadFixture();
-
-  const chunkSuccessCallback = jest.fn();
-
-  upload.on('attempt', (e) => {
-    /*
-     *  - This timeout of 100ms is arbitrary. If this timeout is too low we have a race condition because the nocked 'scope' needs to be done
-     *  - The failure case of the race condition is that scope.isDone() can potentially be false
-     */
-    setTimeout(() => {
-      expect(scope.isDone()).toBeTruthy();
-      expect(chunkSuccessCallback).toHaveBeenCalledTimes(0);
-      done();
-    }, 100);
-  });
-
-  // upload.on('chunkSuccess', chunkSuccessCallback);
-  upload.on('chunkSuccess', (e) => console.log(e.detail))
+  upload.on('chunkSuccess', chunkSuccessCallback);
+  upload.on('attempt', attemptCallback);
 
   upload.on('success', () => {
     done('Upload should not have successfully completed');
