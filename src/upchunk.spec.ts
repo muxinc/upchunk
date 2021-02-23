@@ -311,11 +311,15 @@ test('abort pauses the upload and cancels the current XHR request', (done) => {
   const chunkSuccessCallback = jest.fn();
 
   upload.on('attempt', (e) => {
+    /*
+     *  - This timeout of 100ms is arbitrary. If this timeout is too low we have a race condition because the nocked 'scope' needs to be done
+     *  - The failure case of the race condition is that scope.isDone() can potentially be false
+     */
     setTimeout(() => {
       expect(scope.isDone()).toBeTruthy();
       expect(chunkSuccessCallback).toHaveBeenCalledTimes(0);
       done();
-    }, 10);
+    }, 100);
   });
 
   // upload.on('chunkSuccess', chunkSuccessCallback);
