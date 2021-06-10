@@ -141,6 +141,10 @@ Returns an instance of `UpChunk` and begins uploading the specified `File`.
 
   Resumes an upload that was previously paused.
 
+- `abort()`
+
+  The same behavior as `pause()`, but also aborts the in-flight XHR request.
+
 ### UpChunk Instance Events
 
 Events are fired with a [`CustomEvent`](https://developer.mozilla.org/en-US/docs/Web/API/CustomEvent/CustomEvent) object. The `detail` key is null if an interface isn't specified.
@@ -177,8 +181,23 @@ Events are fired with a [`CustomEvent`](https://developer.mozilla.org/en-US/docs
 
   Fired when the upload is finished successfully.
 
+## FAQ
+
+### How do I cancel an upload?
+
+Our typical suggestion is to use `pause()` or `abort()`, and then clean up the UpChunk instance however you'd like. For example, you could do something like this:
+
+```javascript
+// upload is an UpChunk instance currently in-flight
+upload.abort();
+
+// In many cases, just `abort` should be fine assuming the instance will get picked up by garbage collection
+// If you want to be sure, you can manually delete the instance.
+delete upload;
+```
+
 ## Credit
 
-The original idea and base for this came from the awesome [huge uploader](https://github.com/Buzut/huge-uploader) project, which is what you need if you're looking to do multipart form data uploads. 👏
+The original idea for this came from the awesome [huge uploader](https://github.com/Buzut/huge-uploader) project, which is what you need if you're looking to do multipart form data uploads. 👏
 
 Also, @gabrielginter ported upchunk to [Flutter](https://github.com/gabrielginter/flutter-upchunk).
