@@ -299,10 +299,12 @@ export class UpChunk {
     }
 
     this.getChunk()
-      .then(() => this.sendChunk())
-      .then((res) => {
+      .then(() => {
         this.attemptCount = this.attemptCount + 1;
 
+        return this.sendChunk()
+      })
+      .then((res) => {
         if (SUCCESSFUL_CHUNK_UPLOAD_CODES.includes(res.statusCode)) {
           this.dispatch('chunkSuccess', {
             chunk: this.chunkCount,
