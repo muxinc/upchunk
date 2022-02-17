@@ -56,7 +56,7 @@ module.exports = async (req, res) => {
 };
 ```
 
-### Then, in the browser
+### Then, in the browser with plain Javascript
 
 ```javascript
 import * as UpChunk from '@mux/upchunk';
@@ -89,6 +89,28 @@ picker.onchange = () => {
     console.log("Wrap it up, we're done here. 👋");
   });
 };
+```
+
+### Or, in the browser with React
+
+```javascript
+import * as UpChunk from '@mux/upchunk';
+
+function handleUpload() {
+  const upload = UpChunk.createUpload({
+    endpoint: response.data.url, // Authenticated url
+    file: inputRef.files[0], // File object with your video file’s properties
+    chunkSize: 5120, // Uploads the file in ~5mb chunks
+  });
+  // Subscribe to events
+  upload.on('error', error => {
+    console.error('💥 🙀', error.detail);
+  });
+}
+
+/* Somewhere in your react component, you have a file picker
+   where e.target will give you reference to this element */
+<input onChange={(e) => handleUpload(e.target)} type="file" id="picker" />
 ```
 
 ## API
