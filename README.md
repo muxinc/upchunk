@@ -95,7 +95,6 @@ picker.onchange = () => {
 
 ```javascript
 import React, { useState } from 'react';
-import axios from 'axios';
 import * as UpChunk from '@mux/upchunk';
 
 function Page() {
@@ -104,7 +103,7 @@ function Page() {
 
   const handleUpload = (inputRef) => {
     try {
-      const response = await axios.post('/your-server-endpoint');
+      const response = await fetch('/your-server-endpoint');
     
       const upload = UpChunk.createUpload({
         endpoint: response.data.url, // Authenticated url
