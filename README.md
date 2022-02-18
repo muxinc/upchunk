@@ -94,23 +94,58 @@ picker.onchange = () => {
 ### Or, in the browser with React
 
 ```javascript
+import React, { useState } from 'react';
+import axios from 'axios';
 import * as UpChunk from '@mux/upchunk';
 
-function handleUpload() {
-  const upload = UpChunk.createUpload({
-    endpoint: response.data.url, // Authenticated url
-    file: inputRef.files[0], // File object with your video file’s properties
-    chunkSize: 5120, // Uploads the file in ~5mb chunks
-  });
-  // Subscribe to events
-  upload.on('error', error => {
-    console.error('💥 🙀', error.detail);
-  });
+function Page() {
+  const [progress, setProgress] = useState(0);
+  const [statusMessage, setStatusMessage] = useState(null);
+
+  const handleUpload = (inputRef) => {
+    try {
+      const response = await axios.post('/your-server-endpoint');
+    
+      const upload = UpChunk.createUpload({
+        endpoint: response.data.url, // Authenticated url
+        file: inputRef.files[0], // File object with your video file’s properties
+        chunkSize: 5120, // Uploads the file in ~5mb chunks
+      });
+    
+      // Subscribe to events
+      upload.on('error', error => {
+        setStatusMessage(error.detail);
+      });
+
+      upload.on('progress', progress => {
+        setProgress(progress.detail);
+      });
+
+      upload.on('success', () => {
+        setStatusMessage("Wrap it up, we're done here. 👋");
+      });
+    } catch (error) {
+      setErrorMessage(error);
+    }
+  }
+
+  return (
+    <div className="page-container">
+      <h1>File upload button</h1>
+      <label htmlFor="file-picker">Select a video file:</label>
+      <input type="file" onChange={(e) => handleUpload(e.target)}
+        id="file-picker" name="file-picker"/ >
+
+      <label htmlFor="upload-progress">Downloading progress:</label>
+      <progress value={progress} max="100"/>
+      
+      <em>{statusMessage}</em>
+        
+    </div>
+  );
 }
 
-/* Somewhere in your react component, you have a file picker
-   where e.target will give you reference to this element */
-<input onChange={(e) => handleUpload(e.target)} type="file" id="picker" />
+export default Page;
 ```
 
 ## API
