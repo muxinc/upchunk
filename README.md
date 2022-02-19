@@ -103,10 +103,11 @@ function Page() {
 
   const handleUpload = (inputRef) => {
     try {
-      const response = await fetch('/your-server-endpoint');
+      const response = await fetch('/your-server-endpoint', { method: 'POST' });
+      const url = await response.text();
     
       const upload = UpChunk.createUpload({
-        endpoint: response.data.url, // Authenticated url
+        endpoint: url, // Authenticated url
         file: inputRef.files[0], // File object with your video file’s properties
         chunkSize: 5120, // Uploads the file in ~5mb chunks
       });
