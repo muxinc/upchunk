@@ -59,7 +59,7 @@ export class UpChunk {
     this.file = options.file;
     this.headers = options.headers || ({} as XhrHeaders);
     this.method = options.method || 'PUT';
-    this.chunkSize = options.chunkSize || 5120;
+    this.chunkSize = options.chunkSize || 30720;
     this.attempts = options.attempts || 5;
     this.delayBeforeAttempt = options.delayBeforeAttempt || 1;
 

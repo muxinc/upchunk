@@ -73,7 +73,7 @@ picker.onchange = () => {
   const upload = UpChunk.createUpload({
     endpoint: getUploadUrl,
     file: picker.files[0],
-    chunkSize: 5120, // Uploads the file in ~5mb chunks
+    chunkSize: 30720, // Uploads the file in ~30 MB chunks
   });
 
   // subscribe to events
@@ -109,7 +109,7 @@ function Page() {
       const upload = UpChunk.createUpload({
         endpoint: url, // Authenticated url
         file: inputRef.files[0], // File object with your video file’s properties
-        chunkSize: 5120, // Uploads the file in ~5mb chunks
+        chunkSize: 30720, // Uploads the file in ~30 MB chunks
       });
     
       // Subscribe to events
@@ -168,7 +168,7 @@ Returns an instance of `UpChunk` and begins uploading the specified `File`.
 
   An object with any headers you'd like included with the `PUT` request for each chunk.
 
-- `chunkSize` <small>type: `integer`, default:`5120`</small>
+- `chunkSize` <small>type: `integer`, default:`30720`</small>
 
   The size in kb of the chunks to split the file into, with the exception of the final chunk which may be smaller. This parameter should be in multiples of 256.
 

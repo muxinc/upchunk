@@ -6,7 +6,7 @@ picker.onchange = () => {
   const upload = UpChunk.createUpload({
     endpoint,
     file,
-    chunkSize: 5120,
+    chunkSize: 30720,
   });
 
   // subscribe to events
