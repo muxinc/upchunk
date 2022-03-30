@@ -102,7 +102,7 @@ export class UpChunk {
    * Subscribe to an event
    */
   public on(eventName: EventName, fn: (event: CustomEvent) => void) {
-    this.eventTarget.addEventListener(eventName, fn);
+    this.eventTarget.addEventListener(eventName, fn as EventListener);
   }
 
   public abort() {
@@ -128,7 +128,7 @@ export class UpChunk {
   private dispatch(eventName: EventName, detail?: any) {
     const event = new CustomEvent(eventName, { detail });
 
-    this.eventTarget.dispatchEvent(event);
+    this.eventTarget.dispatchEvent(event as any);
   }
 
   /**
@@ -198,7 +198,7 @@ export class UpChunk {
    * Get portion of the file of x bytes corresponding to chunkSize
    */
   private getChunk() {
-    return new Promise((resolve) => {
+    return new Promise<void> ((resolve) => {
       // Since we start with 0-chunkSize for the range, we need to subtract 1.
       const length =
         this.totalChunks === 1 ? this.file.size : this.chunkByteSize;
