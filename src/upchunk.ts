@@ -248,9 +248,9 @@ export class UpChunk {
     const rangeStart = this.chunkCount * this.chunkByteSize;
     const rangeEnd = rangeStart + this.chunk.size - 1;
     const headers = {
-      ...this.headers,
       'Content-Type': this.file.type,
       'Content-Range': `bytes ${rangeStart}-${rangeEnd}/${this.file.size}`,
+      ...this.headers,      
     };
 
     this.dispatch('attempt', {
