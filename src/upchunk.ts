@@ -1,4 +1,4 @@
-import { EventTarget } from 'event-target-shim';
+import { EventTarget, Event } from 'event-target-shim';
 import xhr, { XhrUrlConfig, XhrHeaders, XhrResponse } from 'xhr';
 
 const SUCCESSFUL_CHUNK_UPLOAD_CODES = [200, 201, 202, 204, 308];
@@ -13,6 +13,10 @@ type EventName =
   | 'online'
   | 'progress'
   | 'success';
+
+// NOTE: This and the EventTarget definition below could be more precise
+// by e.g. typing the detail of the CustomEvent per EventName.
+type UpchunkEvent = CustomEvent & Event<EventName>;
 
 type AllowedMethods =
   | 'PUT'
@@ -30,7 +34,7 @@ export interface UpChunkOptions {
   delayBeforeAttempt?: number;
 }
 
-export class UpChunk {
+export class UpChunk  {
   public endpoint: string | ((file?: File) => Promise<string>);
   public file: File;
   public headers: XhrHeaders;
@@ -52,7 +56,7 @@ export class UpChunk {
   private currentXhr?: XMLHttpRequest;
 
   private reader: FileReader;
-  private eventTarget: EventTarget;
+  private eventTarget: EventTarget<Record<EventName,UpchunkEvent>>;
 
   constructor(options: UpChunkOptions) {
     this.endpoint = options.endpoint;
@@ -126,9 +130,9 @@ export class UpChunk {
    * Dispatch an event
    */
   private dispatch(eventName: EventName, detail?: any) {
-    const event = new CustomEvent(eventName, { detail });
+    const event: UpchunkEvent = new CustomEvent(eventName, { detail }) as UpchunkEvent;
 
-    this.eventTarget.dispatchEvent(event as any);
+    this.eventTarget.dispatchEvent(event);
   }
 
   /**
