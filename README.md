@@ -101,7 +101,7 @@ function Page() {
   const [progress, setProgress] = useState(0);
   const [statusMessage, setStatusMessage] = useState(null);
 
-  const handleUpload = (inputRef) => {
+  const handleUpload = async (inputRef) => {
     try {
       const response = await fetch('/your-server-endpoint', { method: 'POST' });
       const url = await response.text();
