@@ -246,9 +246,9 @@ export class UpChunk  {
   }
 
   /**
-   * Send chunk of the file with appropriate headers and add post parameters if it's last chunk
+   * Send chunk of the file with appropriate headers
    */
-  private sendChunk() {
+  protected async sendChunk() {
     const rangeStart = this.chunkCount * this.chunkByteSize;
     const rangeEnd = rangeStart + this.chunk.size - 1;
     const headers = {
