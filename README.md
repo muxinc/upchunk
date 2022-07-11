@@ -176,11 +176,11 @@ Returns an instance of `UpChunk` and begins uploading the specified `File`.
 
   The maximum size of the file in kb of the input file to be uploaded. The maximum size can technically be smaller than the chunk size, and in that case there would be exactly one chunk.
 
-- `retries` <small>type: `integer`, default: `5`</small>
+- `attempts` <small>type: `integer`, default: `5`</small>
 
   The number of times to retry any given chunk.
 
-- `delayBeforeRetry` <small>type: `integer`, default: `1`</small>
+- `delayBeforeAttempt` <small>type: `integer`, default: `1`</small>
 
   The time in seconds to wait before attempting to upload a chunk again.
 
