@@ -306,7 +306,7 @@ export class UpChunk  {
       .then(() => {
         this.attemptCount = this.attemptCount + 1;
 
-        wrappedFn = this.timeWrapper(this.sendChunk())
+        const wrappedFn = this.timeWrapper(this.sendChunk())
         wrappedFn()
           .then((values)=>{
             const {ret, elapsedTime} = values;
