@@ -306,12 +306,12 @@ export class UpChunk  {
       .then(() => {
         this.attemptCount = this.attemptCount + 1;
 
-        const wrappedFn = this.timeWrapper(this.sendChunk())
-        wrappedFn()
+        const wrappedFn = this.timeWrapper(this.sendChunk)
+        return wrappedFn()
           .then((values)=>{
-            const {ret, elapsedTime} = values;
-            console.log(`ret:[${ret}] elapsedTime:[${elapsedTime}]`);
-            return ret;
+            const { returnValue, timeInterval } = values;
+            console.log(`ret:[${returnValue}] elapsedTime:[${timeInterval}]`);
+            return returnValue;
           })
       })
       .then((res) => {
@@ -365,18 +365,20 @@ export class UpChunk  {
       });
   }
 
-  const timeWrapper = (theFunction) => (...args) => {
-    const startTime = Date.now()
-    const thePromise = theFunction(...args)
-    if (!thePromise.then) {
-        throw 'The wrapped function must return a promise'
+  private timeWrapper<T>(theFunction: (...args: any[]) => Promise<T>) {
+    return function (...args: any[]) {
+      const startTime = Date.now()
+      const thePromise = theFunction(...args)
+      if (!thePromise.then) {
+          throw 'The wrapped function must return a promise'
+      }
+  
+      const timeInterval = (returnValue: T) => {
+          return {returnValue, timeInterval: Date.now() - startTime}
+      }
+  
+      return thePromise.then(timeInterval, timeInterval)
     }
-
-    const timeInterval = (returnValue) => {
-        return {returnValue, timeInterval: Date.now() - startTime}
-    }
-
-    return thePromise.then(timeInterval, timeInterval)
   }
 }
 
