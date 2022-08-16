@@ -306,7 +306,13 @@ export class UpChunk  {
       .then(() => {
         this.attemptCount = this.attemptCount + 1;
 
-        return this.sendChunk()
+        wrappedFn = this.timeWrapper(this.sendChunk())
+        wrappedFn()
+          .then((values)=>{
+            const {ret, elapsedTime} = values;
+            console.log(`ret:[${ret}] elapsedTime:[${elapsedTime}]`);
+            return ret;
+          })
       })
       .then((res) => {
         if (SUCCESSFUL_CHUNK_UPLOAD_CODES.includes(res.statusCode)) {
@@ -357,6 +363,20 @@ export class UpChunk  {
         // this type of error can happen after network disconnection on CORS setup
         this.manageRetries();
       });
+  }
+
+  const timeWrapper = (theFunction) => (...args) => {
+    const startTime = Date.now()
+    const thePromise = theFunction(...args)
+    if (!thePromise.then) {
+        throw 'The wrapped function must return a promise'
+    }
+
+    const timeInterval = (returnValue) => {
+        return {returnValue, timeInterval: Date.now() - startTime}
+    }
+
+    return thePromise.then(timeInterval, timeInterval)
   }
 }
 
