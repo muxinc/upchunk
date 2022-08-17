@@ -1,6 +1,5 @@
 import { EventTarget, Event } from 'event-target-shim';
 import xhr, { XhrUrlConfig, XhrHeaders, XhrResponse } from 'xhr';
-import { DateTime, Interval } from 'luxon';
 
 
 const SUCCESSFUL_CHUNK_UPLOAD_CODES = [200, 201, 202, 204, 308];
@@ -57,9 +56,7 @@ export class UpChunk  {
   private paused: boolean;
   private success: boolean;
   private currentXhr?: XMLHttpRequest;
-  private lastChunkStart: DateTime;
-  private lastChunkEnd: DateTime;
-  private lastChunkInterval: Interval;
+  private lastChunkStart: Date;
 
   private reader: FileReader;
   private eventTarget: EventTarget<Record<EventName,UpchunkEvent>>;
@@ -313,17 +310,18 @@ export class UpChunk  {
     this.getChunk()
       .then(() => {
         this.attemptCount = this.attemptCount + 1;
-	this.lastChunkStart = DateTime.now();
+	      this.lastChunkStart = new Date();
         return this.sendChunk()
       })
       .then((res) => {
         if (SUCCESSFUL_CHUNK_UPLOAD_CODES.includes(res.statusCode)) {
-          this.lastChunkEnd = DateTime.now();
-          this.lastChunkInterval = Interval.fromDateTimes(this.lastChunkStart,this.lastChunkEnd);
+          const lastChunkEnd = new Date();
+          const differenceSeconds = (lastChunkEnd.getTime() - this.lastChunkStart.getTime()) / 1000;
+            
           this.dispatch('chunkSuccess', {
             chunk: this.chunkCount,
             attempts: this.attemptCount,
-            timeInterval: this.lastChunkInterval.length('seconds'),
+            timeInterval: differenceSeconds,
             response: res,
           });
 

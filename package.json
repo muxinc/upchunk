@@ -58,7 +58,6 @@
   },
   "dependencies": {
     "event-target-shim": "^6.0.2",
-    "luxon": "^3.0.1",
     "xhr": "^2.6.0"
   },
   "volta": {
