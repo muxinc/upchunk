@@ -1,5 +1,7 @@
 import { EventTarget, Event } from 'event-target-shim';
 import xhr, { XhrUrlConfig, XhrHeaders, XhrResponse } from 'xhr';
+import { DateTime, Interval } from 'luxon';
+
 
 const SUCCESSFUL_CHUNK_UPLOAD_CODES = [200, 201, 202, 204, 308];
 const TEMPORARY_ERROR_CODES = [408, 502, 503, 504]; // These error codes imply a chunk may be retried
@@ -42,6 +44,7 @@ export class UpChunk  {
   public chunkSize: number;
   public attempts: number;
   public delayBeforeAttempt: number;
+  public dynamicChunkSize: boolean;
 
   private chunk: Blob;
   private chunkCount: number;
@@ -54,9 +57,14 @@ export class UpChunk  {
   private paused: boolean;
   private success: boolean;
   private currentXhr?: XMLHttpRequest;
+  private lastChunkStart: DateTime;
+  private lastChunkEnd: DateTime;
+  private lastChunkInterval: Interval;
 
   private reader: FileReader;
   private eventTarget: EventTarget<Record<EventName,UpchunkEvent>>;
+
+
 
   constructor(options: UpChunkOptions) {
     this.endpoint = options.endpoint;
@@ -305,20 +313,17 @@ export class UpChunk  {
     this.getChunk()
       .then(() => {
         this.attemptCount = this.attemptCount + 1;
-
-        const wrappedFn = this.timeWrapper(this.sendChunk)
-        return wrappedFn()
-          .then((values)=>{
-            const { returnValue, timeInterval } = values;
-            console.log(`ret:[${returnValue}] elapsedTime:[${timeInterval}]`);
-            return returnValue;
-          })
+	this.lastChunkStart = DateTime.now();
+        return this.sendChunk()
       })
       .then((res) => {
         if (SUCCESSFUL_CHUNK_UPLOAD_CODES.includes(res.statusCode)) {
+          this.lastChunkEnd = DateTime.now();
+          this.lastChunkInterval = Interval.fromStartTimes(this.lastChunkStart,this.lastChunkEnd);
           this.dispatch('chunkSuccess', {
             chunk: this.chunkCount,
             attempts: this.attemptCount,
+            timeInterval: this.lastChunkInterval.length('seconds'),
             response: res,
           });
 
@@ -363,22 +368,6 @@ export class UpChunk  {
         // this type of error can happen after network disconnection on CORS setup
         this.manageRetries();
       });
-  }
-
-  private timeWrapper<T>(theFunction: (...args: any[]) => Promise<T>) {
-    return function (...args: any[]) {
-      const startTime = Date.now()
-      const thePromise = theFunction(...args)
-      if (!thePromise.then) {
-          throw 'The wrapped function must return a promise'
-      }
-  
-      const timeInterval = (returnValue: T) => {
-          return {returnValue, timeInterval: Date.now() - startTime}
-      }
-  
-      return thePromise.then(timeInterval, timeInterval)
-    }
   }
 }
 

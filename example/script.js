@@ -22,6 +22,10 @@ picker.onchange = () => {
     console.log('There was an attempt!', detail);
   });
 
+  upload.on('chunkSuccess', ({ detail }) => {
+    console.log('Chunk successfully uploaded!', detail);
+  });
+
   upload.on('success', () => {
     console.log('We did it!');
   });
