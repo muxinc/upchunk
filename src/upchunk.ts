@@ -319,7 +319,7 @@ export class UpChunk  {
       .then((res) => {
         if (SUCCESSFUL_CHUNK_UPLOAD_CODES.includes(res.statusCode)) {
           this.lastChunkEnd = DateTime.now();
-          this.lastChunkInterval = Interval.fromStartTimes(this.lastChunkStart,this.lastChunkEnd);
+          this.lastChunkInterval = Interval.fromDateTimes(this.lastChunkStart,this.lastChunkEnd);
           this.dispatch('chunkSuccess', {
             chunk: this.chunkCount,
             attempts: this.attemptCount,
