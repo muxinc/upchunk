@@ -170,7 +170,7 @@ Returns an instance of `UpChunk` and begins uploading the specified `File`.
 
 - `chunkSize` <small>type: `integer`, default:`30720`</small>
 
-  The size in kB of the chunks to split the file into, with the exception of the final chunk which may be smaller. This parameter should be in multiples of 256.
+  The size in kB of the chunks to split the file into, with the exception of the final chunk which may be smaller. This parameter must be in multiples of 256.
 
 - `maxFileSize` <small>type: `integer`</small>
 
