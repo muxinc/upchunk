@@ -33,6 +33,5 @@ picker.onchange = () => {
 
   upload.on('success', () => {
     console.log('We did it!');
-    console.log('Chunk history: ',upload.getChunkHistory());
   });
 };
