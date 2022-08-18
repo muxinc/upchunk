@@ -44,7 +44,6 @@
   },
   "devDependencies": {
     "@types/jest": "^25.2.3",
-    "@types/luxon": "^3.0.0",
     "esbuild": "^0.14.47",
     "jest": "^26.6.3",
     "nock": "^13.0.5",

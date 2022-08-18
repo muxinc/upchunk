@@ -6,7 +6,10 @@ picker.onchange = () => {
   const upload = UpChunk.createUpload({
     endpoint,
     file,
-    chunkSize: 30720,
+    chunkSize: 16384,
+    dynamicChunkSize: true,
+    minChunkSize: 256,
+    maxChunkSize: 512000,
   });
 
   // subscribe to events
@@ -22,11 +25,16 @@ picker.onchange = () => {
     console.log('There was an attempt!', detail);
   });
 
+  upload.on('attemptFailure', ({ detail }) => {
+    console.log('The attempt failed!', detail);
+  });
+
   upload.on('chunkSuccess', ({ detail }) => {
     console.log('Chunk successfully uploaded!', detail);
   });
 
   upload.on('success', () => {
     console.log('We did it!');
+    console.log('Chunk history: ',upload.getChunkHistory());
   });
 };
