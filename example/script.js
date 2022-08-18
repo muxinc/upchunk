@@ -6,10 +6,8 @@ picker.onchange = () => {
   const upload = UpChunk.createUpload({
     endpoint,
     file,
-    chunkSize: 16384,
-    dynamicChunkSize: true,
-    minChunkSize: 256,
-    maxChunkSize: 512000,
+    chunkSize: 30720,
+    dynamicChunkSize: false,
   });
 
   // subscribe to events

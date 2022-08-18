@@ -411,7 +411,7 @@ export class UpChunk  {
           if (this.paused || this.offline) {
             return;
           }
-	  console.warn('DEBUG: Caught a temporary error: %j',res);
+	  // console.warn('DEBUG: Caught a temporary error: %j',res);
           this.manageRetries();
         } else {
           if (this.paused || this.offline) {
@@ -430,7 +430,7 @@ export class UpChunk  {
           return;
         }
 
-	console.warn('DEBUG: Caught an error: %j',err);
+	// console.warn('DEBUG: Caught an error: %j',err);
         // this type of error can happen after network disconnection on CORS setup
         this.manageRetries();
       });
