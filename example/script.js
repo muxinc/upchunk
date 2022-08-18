@@ -7,6 +7,7 @@ picker.onchange = () => {
     endpoint,
     file,
     chunkSize: 30720,
+    dynamicChunkSize: false,
   });
 
   // subscribe to events
@@ -20,6 +21,14 @@ picker.onchange = () => {
 
   upload.on('attempt', ({ detail }) => {
     console.log('There was an attempt!', detail);
+  });
+
+  upload.on('attemptFailure', ({ detail }) => {
+    console.log('The attempt failed!', detail);
+  });
+
+  upload.on('chunkSuccess', ({ detail }) => {
+    console.log('Chunk successfully uploaded!', detail);
   });
 
   upload.on('success', () => {

@@ -170,7 +170,7 @@ Returns an instance of `UpChunk` and begins uploading the specified `File`.
 
 - `chunkSize` <small>type: `integer`, default:`30720`</small>
 
-  The size in kb of the chunks to split the file into, with the exception of the final chunk which may be smaller. This parameter should be in multiples of 256.
+  The size in kB of the chunks to split the file into, with the exception of the final chunk which may be smaller. This parameter must be in multiples of 256.
 
 - `maxFileSize` <small>type: `integer`</small>
 
@@ -187,6 +187,18 @@ Returns an instance of `UpChunk` and begins uploading the specified `File`.
 - `method` <small>type: `"PUT" | "PATCH" | "POST"`, default: `PUT`</small>
 
   The HTTP method to use when uploading each chunk.
+
+- `dynamicChunkSize` <small>type: `boolean`, default: `false`</small>
+
+  Whether or not the system should dynamically scale the `chunkSize` up and down to adjust to network conditions.
+
+- `maxChunkSize` <small>type: `integer`, default: `512000`</small>
+
+  When `dynamicChunkSize` is `true`, the largest chunk size that will be used, in kB.
+
+- `minChunkSize` <small>type: `integer`, default: `256`</small>
+
+  When `dynamicChunkSize` is `true`, the smallest chunk size that will be used, in kB.
 
 ### UpChunk Instance Methods
 
