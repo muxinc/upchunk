@@ -214,10 +214,6 @@ Returns an instance of `UpChunk` and begins uploading the specified `File`.
 
   The same behavior as `pause()`, but also aborts the in-flight XHR request.
 
-- `getHistory()`
-
-  Retrieve the history of each chunk uploaded, the chunk size, and the time it took to upload each chunk.
-
 ### UpChunk Instance Events
 
 Events are fired with a [`CustomEvent`](https://developer.mozilla.org/en-US/docs/Web/API/CustomEvent/CustomEvent) object. The `detail` key is null if an interface isn't specified.

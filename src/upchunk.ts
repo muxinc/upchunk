@@ -37,13 +37,6 @@ export interface UpChunkOptions {
   minChunkSize?: number;
 }
 
-type chunkHistoryRecord = {
-  chunk: number,
-  attempts: number,
-  chunkSize: number,
-  timeInterval: number,
-};
-
 export class UpChunk  {
   public endpoint: string | ((file?: File) => Promise<string>);
   public file: File;
@@ -66,7 +59,6 @@ export class UpChunk  {
   private success: boolean;
   private currentXhr?: XMLHttpRequest;
   private lastChunkStart: Date;
-  private chunkHistory: chunkHistoryRecord[];
   private nextChunkRangeStart: number;
   private maxChunkSize: number;
   private minChunkSize: number;
@@ -94,7 +86,6 @@ export class UpChunk  {
     this.offline = false;
     this.paused = false;
     this.success = false;
-    this.chunkHistory = [];
     this.nextChunkRangeStart = 0;
     this.maxChunkSize = options.maxChunkSize || 512000; // in kB
     this.minChunkSize = options.minChunkSize || 256; // in kB
@@ -363,17 +354,9 @@ export class UpChunk  {
           const lastChunkEnd = new Date();
           const lastChunkInterval = (lastChunkEnd.getTime() - this.lastChunkStart.getTime()) / 1000;
 
-          this.chunkHistory.push({
-            chunk: this.chunkCount,
-            attempts: this.attemptCount,
-            chunkSize: this.chunk.size/1024,
-            timeInterval: lastChunkInterval,
-          });
-
           this.dispatch('chunkSuccess', {
             chunk: this.chunkCount,
             chunkSize: this.chunkSize,
-            realChunkSize: this.chunk.size,
             attempts: this.attemptCount,
             timeInterval: lastChunkInterval,
             response: res,
@@ -434,10 +417,6 @@ export class UpChunk  {
         // this type of error can happen after network disconnection on CORS setup
         this.manageRetries();
       });
-  }
-
-  protected getChunkHistory() {
-    return this.chunkHistory;
   }
 }
 
