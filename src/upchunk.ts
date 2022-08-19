@@ -32,6 +32,7 @@ export interface UpChunkOptions {
   chunkSize?: number;
   attempts?: number;
   delayBeforeAttempt?: number;
+  retryCodes?: number[];
   dynamicChunkSize?: boolean;
   maxChunkSize?: number;
   minChunkSize?: number;
@@ -45,6 +46,7 @@ export class UpChunk  {
   public chunkSize: number;
   public attempts: number;
   public delayBeforeAttempt: number;
+  public retryCodes: number[];
   public dynamicChunkSize: boolean;
 
   private chunk: Blob;
@@ -76,6 +78,7 @@ export class UpChunk  {
     this.chunkSize = options.chunkSize || 30720;
     this.attempts = options.attempts || 5;
     this.delayBeforeAttempt = options.delayBeforeAttempt || 1;
+    this.retryCodes = options.retryCodes || TEMPORARY_ERROR_CODES;
     this.dynamicChunkSize = options.dynamicChunkSize || false;
 
     this.maxFileBytes = (options.maxFileSize || 0) * 1024;
@@ -392,7 +395,7 @@ export class UpChunk  {
             this.dispatch('success');
           }
 
-        } else if (TEMPORARY_ERROR_CODES.includes(res.statusCode)) {
+        } else if (this.retryCodes.includes(res.statusCode)) {
           if (this.paused || this.offline) {
             return;
           }
