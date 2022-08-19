@@ -282,7 +282,7 @@ test('progress event fires the correct upload percentage', (done) => {
         done('All scopes not completed');
       }
     });
-    expect(progressCallback).toHaveBeenCalledTimes(7);
+    expect(progressCallback).toHaveBeenCalledTimes(4);
     const progressPercentageArray = progressCallback.mock.calls.map(([percentage]) => percentage);
     expect(isNumberArraySorted(progressPercentageArray)).toBeTruthy();
     done();
