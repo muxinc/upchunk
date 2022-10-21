@@ -39,6 +39,7 @@ yarn add @mux/upchunk
 You'll need to have a route in your application that returns an upload URL from Mux. If you're using the [Mux Node SDK](https://github.com/muxinc/mux-node-sdk), you might do something that looks like this.
 
 ```javascript
+const Mux = require('@mux/mux-node');
 const { Video } = new Mux();
 
 module.exports = async (req, res) => {
