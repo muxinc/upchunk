@@ -265,6 +265,9 @@ upload.abort();
 delete upload;
 ```
 
+### May I use UpChunk from the frontend of my application?
+No, the process will fail and raise an error.
+
 ## Credit
 
 The original idea for this came from the awesome [huge uploader](https://github.com/Buzut/huge-uploader) project, which is what you need if you're looking to do multipart form data uploads. 👏
