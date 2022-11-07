@@ -1,12 +1,14 @@
 {
   "compilerOptions": {
+    "target": "ES2019",
     "declaration": true,
     "declarationDir": "./dist",
     "noImplicitAny": true,
     "outDir": "./dist",
     "strictNullChecks": true,
-    "lib": ["dom", "es2016"]
+    "moduleResolution": "node",
+    "lib": ["dom", "ES2016"]
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*.ts"],
   "exclude": ["src/**/*.spec.ts"]
 }
