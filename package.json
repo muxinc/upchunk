@@ -31,7 +31,7 @@
   ],
   "scripts": {
     "clean": "rimraf ./dist",
-    "test": "jest",
+    "test": "web-test-runner",
     "lint": "tslint --project .",
     "tslint-check": "tslint-config-prettier-check ./tslint.json",
     "start": "esbuild      src/upchunk.ts --target=es2019 --format=iife --bundle --minify --sourcemap --outdir=./example --global-name=UpChunk --servedir=example",
@@ -43,17 +43,18 @@
     "build": "yarn clean && yarn lint && yarn build:all && yarn pack"
   },
   "devDependencies": {
-    "@types/jest": "^25.2.3",
+    "@open-wc/testing": "^3.1.6",
+    "@web/dev-server-esbuild": "^0.3.3",
+    "@web/dev-server-import-maps": "^0.0.7",
+    "@web/test-runner": "^0.15.0",
     "esbuild": "^0.14.47",
-    "jest": "^26.6.3",
-    "nock": "^13.0.5",
     "npm-run-all": "^4.1.5",
     "rimraf": "^3.0.2",
-    "ts-jest": "^26.1.0",
     "tslint": "^6.1.2",
     "tslint-config-airbnb": "^5.11.2",
     "tslint-config-prettier": "^1.18.0",
-    "typescript": "^4.7.4"
+    "typescript": "^4.7.4",
+    "xhr-mock": "^2.5.1"
   },
   "dependencies": {
     "event-target-shim": "^6.0.2",

@@ -57,7 +57,7 @@ export class UpChunk  {
   private totalChunks: number;
   private attemptCount: number;
   private offline: boolean;
-  private paused: boolean;
+  private _paused: boolean;
   private success: boolean;
   private currentXhr?: XMLHttpRequest;
   private lastChunkStart: Date;
@@ -87,7 +87,7 @@ export class UpChunk  {
     this.totalChunks = Math.ceil(this.file.size / this.chunkByteSize);
     this.attemptCount = 0;
     this.offline = false;
-    this.paused = false;
+    this._paused = false;
     this.success = false;
     this.nextChunkRangeStart = 0;
     this.maxChunkSize = options.maxChunkSize || 512000; // in kB
@@ -126,18 +126,22 @@ export class UpChunk  {
     this.eventTarget.addEventListener(eventName, fn as EventListener);
   }
 
+  public get paused() {
+    return this._paused;
+  }
+
   public abort() {
     this.pause();
     this.currentXhr?.abort();
   }
 
   public pause() {
-    this.paused = true;
+    this._paused = true;
   }
 
   public resume() {
-    if (this.paused) {
-      this.paused = false;
+    if (this._paused) {
+      this._paused = false;
 
       this.sendChunks();
     }
@@ -342,7 +346,7 @@ export class UpChunk  {
    * handle errors & retries and dispatch events
    */
   private sendChunks() {
-    if (this.paused || this.offline || this.success) {
+    if (this._paused || this.offline || this.success) {
       return;
     }
 
@@ -396,13 +400,13 @@ export class UpChunk  {
           }
 
         } else if (this.retryCodes.includes(res.statusCode)) {
-          if (this.paused || this.offline) {
+          if (this._paused || this.offline) {
             return;
           }
           // console.warn('DEBUG: Caught a temporary error: %j',res);
           this.manageRetries();
         } else {
-          if (this.paused || this.offline) {
+          if (this._paused || this.offline) {
             return;
           }
 
@@ -414,7 +418,7 @@ export class UpChunk  {
         }
       })
       .catch((err) => {
-        if (this.paused || this.offline) {
+        if (this._paused || this.offline) {
           return;
         }
 

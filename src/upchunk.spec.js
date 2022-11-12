@@ -5,7 +5,8 @@
  * we still yell when we're supposed to.
  */
 
-const { createUpload, UpChunk } = require('./upchunk');
+import { expect } from '@open-wc/testing';
+import { createUpload, UpChunk } from './upchunk';
 
 const fakeFile = () => {
   return new File(['foo'], 'foo.mp4', {
@@ -24,89 +25,89 @@ describe('option validation', () => {
     ...options,
   });
 
-  test('returns a new UpChunk instance when given valid params', () => {
+  it('returns a new UpChunk instance when given valid params', () => {
     const upload = createUpload(buildParams());
-    expect(upload).toBeInstanceOf(UpChunk);
+    expect(upload).to.be.an.instanceOf(UpChunk);
   });
 
-  test('accepts a function that returns a promise for endpoint', () => {
+  it('accepts a function that returns a promise for endpoint', () => {
     const upload = createUpload(
       buildParams({ endpoint: () => Promise.resolve('/foo') })
     );
-    expect(upload).toBeInstanceOf(UpChunk);
+    expect(upload).to.be.an.instanceOf(UpChunk);
   });
 
   describe('throws', () => {
-    test('endpoint is not included', () => {
+    it('endpoint is not included', () => {
       const params = buildParams({ endpoint: undefined });
 
-      expect(() => createUpload(params)).toThrow(TypeError);
+      expect(() => createUpload(params)).to.throw(TypeError);
     });
 
-    test('endpoint is an empty string', () => {
+    it('endpoint is an empty string', () => {
       const params = buildParams({ endpoint: '' });
 
-      expect(() => createUpload(params)).toThrow(TypeError);
+      expect(() => createUpload(params)).to.throw(TypeError);
     });
 
-    test('file is not included', () => {
+    it('file is not included', () => {
       const params = buildParams({ file: undefined });
 
-      expect(() => createUpload(params)).toThrow(TypeError);
+      expect(() => createUpload(params)).to.throw(TypeError);
     });
 
-    test('file is not a File', () => {
+    it('file is not a File', () => {
       const params = buildParams({ file: 'neato' });
 
-      expect(() => createUpload(params)).toThrow(TypeError);
+      expect(() => createUpload(params)).to.throw(TypeError);
     });
 
-    test('headers are specified and not an object', () => {
+    it('headers are specified and not an object', () => {
       const params = buildParams({ headers: 'hey neato' });
 
-      expect(() => createUpload(params)).toThrow(TypeError);
+      expect(() => createUpload(params)).to.throw(TypeError);
     });
 
-    test('chunkSize is not a number', () => {
+    it('chunkSize is not a number', () => {
       const params = buildParams({ chunkSize: 'cool' });
 
-      expect(() => createUpload(params)).toThrow(TypeError);
+      expect(() => createUpload(params)).to.throw(TypeError);
     });
 
-    test('chunkSize is a positive integer', () => {
+    it('chunkSize is a positive integer', () => {
       const params = buildParams({ chunkSize: -256 });
 
-      expect(() => createUpload(params)).toThrow(TypeError);
+      expect(() => createUpload(params)).to.throw(TypeError);
     });
 
-    test('chunkSize is not a multiple of 256', () => {
+    it('chunkSize is not a multiple of 256', () => {
       const params = buildParams({ chunkSize: 100 });
 
-      expect(() => createUpload(params)).toThrow(TypeError);
+      expect(() => createUpload(params)).to.throw(TypeError);
     });
 
-    test('attempts is not a number', () => {
+    it('attempts is not a number', () => {
       const params = buildParams({ attempts: 'foo' });
 
-      expect(() => createUpload(params)).toThrow(TypeError);
+      expect(() => createUpload(params)).to.throw(TypeError);
     });
 
-    test('attempts is not a positive number', () => {
+    it('attempts is not a positive number', () => {
       const params = buildParams({ attempts: -1 });
 
-      expect(() => createUpload(params)).toThrow(TypeError);
+      expect(() => createUpload(params)).to.throw(TypeError);
     });
 
-    test('delayBeforeAttempt is not a positive number', () => {
+    it('delayBeforeAttempt is not a positive number', () => {
       const params = buildParams({ delayBeforeAttempt: -1 });
 
-      expect(() => createUpload(params)).toThrow(TypeError);
+      expect(() => createUpload(params)).to.throw(TypeError);
     });
 
-    test('an error is thrown if input file is larger than max', () => {
+    it('an error is thrown if input file is larger than max', () => {
       const params = buildParams({ maxFileSize: (fakeFile().size - 1) / 1024 });
 
-      expect(() => createUpload(params)).toThrow(Error);
+      expect(() => createUpload(params)).to.throw(Error);
     });
   });
 });
