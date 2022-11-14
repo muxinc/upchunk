@@ -1,3 +1,4 @@
 node_modules
 dist
+test/dist
 mux-upchunk-v*.tgz

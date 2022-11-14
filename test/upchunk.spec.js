@@ -6,7 +6,7 @@
  */
 
 import { expect } from '@open-wc/testing';
-import { createUpload, UpChunk } from './upchunk';
+import { createUpload, UpChunk } from '../src/upchunk';
 
 const fakeFile = () => {
   return new File(['foo'], 'foo.mp4', {

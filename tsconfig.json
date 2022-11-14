@@ -9,6 +9,5 @@
     "moduleResolution": "node",
     "lib": ["dom", "ES2016"]
   },
-  "include": ["src/**/*.ts"],
-  "exclude": ["src/**/*.spec.ts"]
+  "include": ["src/**/*.ts"]
 }
