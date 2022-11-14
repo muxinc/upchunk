@@ -73,14 +73,14 @@ describe('integration', () => {
           expect(req.header('Content-range')).to.eql(
             `bytes 0-${fileBytes / 2 - 1}/${fileBytes}`
           );
-          count++;
+          count = count + 1;
           return res.status(200);
         },
         (req, res) => {
           expect(req.header('Content-range')).to.eql(
             `bytes ${fileBytes / 2}-${fileBytes - 1}/${fileBytes}`
           );
-          count++;
+          count = count + 1;
           return res.status(200);
         },
       ])
@@ -213,7 +213,7 @@ describe('integration', () => {
     const upload = createUploadFixture();
 
     upload.on('chunkSuccess', () => {
-      calls++;
+      calls = calls + 1;
     });
 
     upload.on('success', () => {
@@ -222,94 +222,71 @@ describe('integration', () => {
     });
   });
 
-  /** @TODO Figure out how to best handle progress testing. See: https://www.npmjs.com/package/xhr-mock#upload-progress (CJP) */
-  // const isNumberArraySorted = (a: number[]): boolean => {
-  //   for (let i = 0; i < a.length - 1; i += 1) {
-  //     if (a[i] > a[i + 1]) {
-  //       return false;
-  //     }
-  //   }
-  //   return true;
-  // };
+  const isNumberArraySorted = (a: number[]): boolean => {
+    for (let i = 0; i < a.length - 1; i += 1) {
+      if (a[i] > a[i + 1]) {
+        return false;
+      }
+    }
+    return true;
+  };
 
-  // it('progress event fires the correct upload percentage', (done) => {
-  //   const fileBytes = 1048576;
-  //   const upload = createUploadFixture(
-  //     {},
-  //     new File([new ArrayBuffer(fileBytes)], 'test.mp4')
-  //   );
+  it('progress event fires the correct upload percentage', (done) => {
+    xhrMock.put(endpoint, { status: 200 });
+    const fileBytes = 1048576;
+    const upload = createUploadFixture(
+      {
+        headers: {
+          // NOTE: Adding this as an arbitrary value to cause xhr-mock to cause progress events to be dispatched.
+          // See: https://www.npmjs.com/package/xhr-mock#upload-progress
+          'Content-Length': '1',
+        },
+      },
+      new File([new ArrayBuffer(fileBytes)], 'test.mp4')
+    );
 
-  //   const scopes = [
-  //     nock('https://example.com')
-  //       .matchHeader('content-range', `bytes 0-${fileBytes / 4 - 1}/${fileBytes}`)
-  //       .put('/upload/endpoint')
-  //       .reply(200),
-  //     nock('https://example.com')
-  //       .matchHeader(
-  //         'content-range',
-  //         `bytes ${fileBytes / 4}-${fileBytes / 2 - 1}/${fileBytes}`
-  //       )
-  //       .put('/upload/endpoint')
-  //       .reply(200),
-  //     nock('https://example.com')
-  //       .matchHeader(
-  //         'content-range',
-  //         `bytes ${fileBytes / 2}-${3 * fileBytes / 4 - 1}/${fileBytes}`
-  //       )
-  //       .put('/upload/endpoint')
-  //       .reply(200),
-  //     nock('https://example.com')
-  //       .matchHeader(
-  //         'content-range',
-  //         `bytes ${3 * fileBytes / 4}-${fileBytes - 1}/${fileBytes}`
-  //       )
-  //       .put('/upload/endpoint')
-  //       .reply(200),
-  //   ];
+    upload.on('error', (err) => {
+      done(err);
+    });
 
-  //   const progressCallback = jest.fn((percentage) => percentage);
+    let progressCount = 0;
+    const progressArray: number[] = [];
+    upload.on('progress', (progress) => {
+      progressCount = progressCount + 1;
+      progressArray.push(progress.detail);
+    });
 
-  //   upload.on('error', (err) => {
-  //     done(err);
-  //   });
-
-  //   upload.on('progress', (progress) => {
-  //     progressCallback(progress.detail);
-  //   });
-
-  //   upload.on('success', () => {
-  //     scopes.forEach((scope) => {
-  //       if (!scope.isDone()) {
-  //         done('All scopes not completed');
-  //       }
-  //     });
-  //     expect(progressCallback).toHaveBeenCalledTimes(4);
-  //     const progressPercentageArray = progressCallback.xhrMock.calls.map(([percentage]) => percentage);
-  //     expect(isNumberArraySorted(progressPercentageArray)).toBeTruthy();
-  //     done();
-  //   });
-  // }, 10000);
+    upload.on('success', () => {
+      expect(progressCount).to.equal(4);
+      expect(isNumberArraySorted(progressArray)).to.be.true;
+      done();
+    });
+  });
 
   it('abort pauses the upload and cancels the current XHR request', (done) => {
     let upload: UpChunk;
     let attemptCt = 0;
 
-    // xhrMock.put(endpoint, { status: 200 });
     xhrMock.put(endpoint, delay({ status: 200 }, 1000));
 
     upload = createUploadFixture();
 
     upload.on('attempt', () => {
-      attemptCt++;
-      console.log('attempt!')
+      attemptCt = attemptCt + 1;
       if (attemptCt === 1) {
         upload.abort();
       } else {
-        done(new Error(`Error: never should have gotten past attempt 1. Currently attempting ${attemptCt}`));
+        done(
+          new Error(
+            `Error: never should have gotten past attempt 1. Currently attempting ${attemptCt}`
+          )
+        );
       }
     });
 
-    upload.on('success', () => done(new Error('Error: should be paused before success but succeeded')));
+    upload.on('success', () =>
+      done(new Error('Error: should be paused before success but succeeded'))
+    );
     // This appears to be called still?
     // upload.on('chunkSuccess', () => done(new Error('Error: should be paused before any chunkSuccess but chunkSuccess')));
 
@@ -317,6 +294,5 @@ describe('integration', () => {
       expect(upload.paused).to.be.true;
       done();
     }, 50);
-
   });
 });
