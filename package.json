@@ -31,9 +31,10 @@
   ],
   "scripts": {
     "clean": "rimraf ./dist",
-    "test": "web-test-runner",
+    "test": "yarn build:test && web-test-runner --config test/web-test-runner.config.mjs",
     "lint": "tslint --project .",
     "tslint-check": "tslint-config-prettier-check ./tslint.json",
+    "build:test": "esbuild ./test/deps/xhr-mock.ts ./test/deps/xhr.ts --target=es2019 --format=esm --bundle --minify --outdir=./test/dist --out-extension:.js=.mjs",
     "start": "esbuild      src/upchunk.ts --target=es2019 --format=iife --bundle --minify --sourcemap --outdir=./example --global-name=UpChunk --servedir=example",
     "build:iife": "esbuild src/upchunk.ts --target=es2019 --format=iife --bundle --minify --sourcemap --outdir=./dist    --global-name=UpChunk",
     "build:esm": "esbuild  src/upchunk.ts --target=es2019 --format=esm  --bundle --minify --sourcemap --outdir=./dist --out-extension:.js=.mjs",
