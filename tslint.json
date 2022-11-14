@@ -7,6 +7,6 @@
     "no-unused-variable": [true, { "ignore-pattern": "^_" }],
     "no-var-requires": false,
     "space-before-function-paren": false,
-    "variable-name": [true, "ban-keywords", "check-format", "allow-pascal-case"]
+    "variable-name": [true, "ban-keywords", "check-format", "allow-pascal-case", "allow-leading-underscore"]
   }
 }
