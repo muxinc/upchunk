@@ -1,7 +1,7 @@
 import { expect } from '@open-wc/testing';
 import xhrMock, { sequence, delay } from 'xhr-mock';
 import xhr from 'xhr';
-import { UpChunk, createUpload, UpChunkOptions } from '../src/upchunk';
+import { UpChunk, createUpload, UpChunkOptions } from './upchunk';
 
 describe('integration', () => {
   const endpoint = `https://this-is-a-fake-url.com/upload/endpoint`;

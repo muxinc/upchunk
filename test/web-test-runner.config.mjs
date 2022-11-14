@@ -3,8 +3,10 @@ import { importMapsPlugin } from '@web/dev-server-import-maps';
 
 export default {
   nodeResolve: true,
-  files: ['test/**/*.spec.js', 'test/**/*.spec.ts'],
-  // files: ['src/**/*.spec.js'],
+  /** @TODO Final home for tests. Uncomment before PR merge */
+  // files: ['test/**/*.spec.js', 'test/**/*.spec.ts'],
+  /** @TODO Interim home for tests to make diff/code review easier. Remove before PR merge */
+  files: ['src/**/*.spec.js', 'src/**/*.spec.ts'],
   plugins: [
     importMapsPlugin({
       inject: {
