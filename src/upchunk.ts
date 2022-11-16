@@ -1,8 +1,163 @@
 import { EventTarget, Event } from 'event-target-shim';
-import xhr, { XhrUrlConfig, XhrHeaders, XhrResponse } from 'xhr';
+import xhr, { type XhrUrlConfig, type XhrHeaders, type XhrResponse } from 'xhr';
+
+const DEFAULT_CHUNK_SIZE = 30720;
+const DEFAULT_MAX_CHUNK_SIZE = 512000; // in kB
+const DEFAULT_MIN_CHUNK_SIZE = 256; // in kB
+
+export const isValidChunkSize = (
+  chunkSize: any,
+  {
+    minChunkSize = DEFAULT_MIN_CHUNK_SIZE,
+    maxChunkSize = DEFAULT_MAX_CHUNK_SIZE,
+  } = {}
+): chunkSize is number | null | undefined => {
+  return (
+    chunkSize == null ||
+    (typeof chunkSize === 'number' &&
+      chunkSize >= 256 &&
+      chunkSize % 256 === 0 &&
+      chunkSize >= minChunkSize &&
+      chunkSize <= maxChunkSize)
+  );
+};
+
+export const getChunkSizeError = (
+  chunkSize: any,
+  {
+    minChunkSize = DEFAULT_MIN_CHUNK_SIZE,
+    maxChunkSize = DEFAULT_MAX_CHUNK_SIZE,
+  } = {}
+) => {
+  return new TypeError(
+    `chunkSize ${chunkSize} must be a positive number in multiples of 256, between ${minChunkSize} and ${maxChunkSize}`
+  );
+};
+
+export type ChunkedStreamIterableOptions = {
+  defaultChunkSize?: number;
+  minChunkSize?: number;
+  maxChunkSize?: number;
+};
+
+export class ChunkedStreamIterable implements AsyncIterable<Blob> {
+  protected defaultChunkSize: number;
+  public readonly minChunkSize: number;
+  public readonly maxChunkSize: number;
+
+  constructor(
+    protected readableStream: ReadableStream<Uint8Array | Blob>,
+    options: ChunkedStreamIterableOptions = {}
+  ) {
+    if (!isValidChunkSize(options.defaultChunkSize, options)) {
+      throw getChunkSizeError(options.defaultChunkSize, options);
+    }
+    this.defaultChunkSize = options.defaultChunkSize ?? DEFAULT_CHUNK_SIZE;
+    this.minChunkSize = options.minChunkSize ?? DEFAULT_MIN_CHUNK_SIZE;
+    this.maxChunkSize = options.maxChunkSize ?? DEFAULT_MAX_CHUNK_SIZE;
+  }
+
+  protected _chunkSize: number | undefined;
+
+  get chunkSize() {
+    return this._chunkSize ?? this.defaultChunkSize;
+  }
+
+  set chunkSize(value) {
+    if (!isValidChunkSize(value, this)) {
+      throw getChunkSizeError(value, this);
+    }
+    this._chunkSize = value;
+  }
+
+  get chunkByteSize() {
+    return this.chunkSize * 1024;
+  }
+
+  async *[Symbol.asyncIterator](): AsyncIterator<Blob> {
+    let chunk;
+    const reader = this.readableStream.getReader();
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) {
+          // Last chunk, if any bits remain
+          if (chunk) {
+            const outgoingChunk = chunk;
+            chunk = undefined;
+            yield outgoingChunk;
+          }
+          break;
+        }
+
+        const normalizedBlobChunk =
+          value instanceof Uint8Array
+            ? new Blob([value], { type: 'application/octet-stream' })
+            : value;
+
+        chunk = chunk
+          ? new Blob([chunk, normalizedBlobChunk])
+          : normalizedBlobChunk;
+
+        // NOTE: Since we don't know how big the next chunk needs to be, we should
+        // just have a single blob that we "peel away bytes from" for each chunk
+        // as we iterate.
+        while (chunk) {
+          if (chunk.size === this.chunkByteSize) {
+            const outgoingChunk = chunk;
+            chunk = undefined;
+            yield outgoingChunk;
+            break;
+          } else if (chunk.size < this.chunkByteSize) {
+            break;
+          } else {
+            const outgoingChunk = chunk.slice(0, this.chunkByteSize);
+            chunk = chunk.slice(this.chunkByteSize);
+            yield outgoingChunk;
+          }
+        }
+      }
+    } finally {
+      // Last chunk, if any bits remain
+      if (chunk) {
+        const outgoingChunk = chunk;
+        chunk = undefined;
+        yield outgoingChunk;
+      }
+      reader.releaseLock();
+      return;
+    }
+  }
+}
 
 const SUCCESSFUL_CHUNK_UPLOAD_CODES = [200, 201, 202, 204, 308];
 const TEMPORARY_ERROR_CODES = [408, 502, 503, 504]; // These error codes imply a chunk may be retried
+
+type UploadPredOptions = {
+  retryCodes?: typeof TEMPORARY_ERROR_CODES;
+  attempts: number;
+  attemptCount: number;
+};
+const isSuccessfulChunkUpload = (
+  res: XhrResponse | undefined,
+  _options?: any
+): res is XhrResponse =>
+  !!res && SUCCESSFUL_CHUNK_UPLOAD_CODES.includes(res.statusCode);
+
+const isRetriableChunkUpload = (
+  res: XhrResponse | undefined,
+  { retryCodes = TEMPORARY_ERROR_CODES }: UploadPredOptions
+) => !res || retryCodes.includes(res.statusCode);
+
+const isFailedChunkUpload = (
+  res: XhrResponse | undefined,
+  options: UploadPredOptions
+): res is XhrResponse => {
+  return (
+    options.attemptCount >= options.attempts ||
+    !(isSuccessfulChunkUpload(res) || isRetriableChunkUpload(res, options))
+  );
+};
 
 type EventName =
   | 'attempt'
@@ -18,10 +173,7 @@ type EventName =
 // by e.g. typing the detail of the CustomEvent per EventName.
 type UpchunkEvent = CustomEvent & Event<EventName>;
 
-type AllowedMethods =
-  | 'PUT'
-  | 'POST'
-  | 'PATCH';
+type AllowedMethods = 'PUT' | 'POST' | 'PATCH';
 
 export interface UpChunkOptions {
   endpoint: string | ((file?: File) => Promise<string>);
@@ -38,20 +190,20 @@ export interface UpChunkOptions {
   minChunkSize?: number;
 }
 
-export class UpChunk  {
+export class UpChunk {
   public endpoint: string | ((file?: File) => Promise<string>);
   public file: File;
   public headers: XhrHeaders;
   public method: AllowedMethods;
-  public chunkSize: number;
   public attempts: number;
   public delayBeforeAttempt: number;
   public retryCodes: number[];
   public dynamicChunkSize: boolean;
+  protected chunkedStreamIterable: ChunkedStreamIterable;
+  protected chunkedStreamIterator;
 
-  private chunk: Blob;
+  protected pendingChunk?: Blob;
   private chunkCount: number;
-  private chunkByteSize: number;
   private maxFileBytes: number;
   private endpointValue: string;
   private totalChunks: number;
@@ -62,20 +214,15 @@ export class UpChunk  {
   private currentXhr?: XMLHttpRequest;
   private lastChunkStart: Date;
   private nextChunkRangeStart: number;
-  private maxChunkSize: number;
-  private minChunkSize: number;
 
-  private reader: FileReader;
-  private eventTarget: EventTarget<Record<EventName,UpchunkEvent>>;
-
-
+  private eventTarget: EventTarget<Record<EventName, UpchunkEvent>>;
 
   constructor(options: UpChunkOptions) {
     this.endpoint = options.endpoint;
     this.file = options.file;
+
     this.headers = options.headers || ({} as XhrHeaders);
     this.method = options.method || 'PUT';
-    this.chunkSize = options.chunkSize || 30720;
     this.attempts = options.attempts || 5;
     this.delayBeforeAttempt = options.delayBeforeAttempt || 1;
     this.retryCodes = options.retryCodes || TEMPORARY_ERROR_CODES;
@@ -83,17 +230,21 @@ export class UpChunk  {
 
     this.maxFileBytes = (options.maxFileSize || 0) * 1024;
     this.chunkCount = 0;
-    this.chunkByteSize = this.chunkSize * 1024;
-    this.totalChunks = Math.ceil(this.file.size / this.chunkByteSize);
     this.attemptCount = 0;
     this.offline = false;
     this._paused = false;
     this.success = false;
     this.nextChunkRangeStart = 0;
-    this.maxChunkSize = options.maxChunkSize || 512000; // in kB
-    this.minChunkSize = options.minChunkSize || 256; // in kB
 
-    this.reader = new FileReader();
+    // Types appear to be getting confused in env setup, using the overloaded NodeJS Blob definition, which uses NodeJS.ReadableStream instead
+    // of the DOM type definitions. For definitions, See consumers.d.ts vs. lib.dom.d.ts. (CJP)
+    this.chunkedStreamIterable = new ChunkedStreamIterable(
+      this.file.stream() as unknown as ReadableStream<Uint8Array>,
+      { ...options, defaultChunkSize: options.chunkSize }
+    );
+    this.chunkedStreamIterator =
+      this.chunkedStreamIterable[Symbol.asyncIterator]();
+
     this.eventTarget = new EventTarget();
 
     this.validateOptions();
@@ -101,7 +252,7 @@ export class UpChunk  {
 
     // restart sync when back online
     // trigger events when offline/back online
-    if (typeof(window) !== 'undefined') {
+    if (typeof window !== 'undefined') {
       window.addEventListener('online', () => {
         if (!this.offline) {
           return;
@@ -117,6 +268,30 @@ export class UpChunk  {
         this.dispatch('offline');
       });
     }
+  }
+
+  protected get maxChunkSize() {
+    return this.chunkedStreamIterable?.chunkSize ?? DEFAULT_MAX_CHUNK_SIZE;
+  }
+
+  protected get minChunkSize() {
+    return this.chunkedStreamIterable?.chunkSize ?? DEFAULT_MIN_CHUNK_SIZE;
+  }
+
+  public get chunkSize() {
+    return this.chunkedStreamIterable?.chunkSize ?? DEFAULT_CHUNK_SIZE;
+  }
+
+  public set chunkSize(value) {
+    this.chunkedStreamIterable.chunkSize = value;
+  }
+
+  public get chunkByteSize() {
+    return this.chunkedStreamIterable.chunkByteSize;
+  }
+
+  public get totalChunkSize() {
+    return Math.ceil(this.file.size / this.chunkByteSize);
   }
 
   /**
@@ -151,7 +326,9 @@ export class UpChunk  {
    * Dispatch an event
    */
   private dispatch(eventName: EventName, detail?: any) {
-    const event: UpchunkEvent = new CustomEvent(eventName, { detail }) as UpchunkEvent;
+    const event: UpchunkEvent = new CustomEvent(eventName, {
+      detail,
+    }) as UpchunkEvent;
 
     this.eventTarget.dispatchEvent(event);
   }
@@ -175,16 +352,15 @@ export class UpChunk  {
       throw new TypeError('headers must be null or an object');
     }
     if (
-      this.chunkSize &&
-      (typeof this.chunkSize !== 'number' ||
-        this.chunkSize < 256 ||
-        this.chunkSize % 256 !== 0 ||
-        this.chunkSize < this.minChunkSize ||
-        this.chunkSize > this.maxChunkSize)
+      !isValidChunkSize(this.chunkSize, {
+        maxChunkSize: this.maxChunkSize,
+        minChunkSize: this.minChunkSize,
+      })
     ) {
-      throw new TypeError(
-        `chunkSize must be a positive number in multiples of 256, between ${this.minChunkSize} and ${this.maxChunkSize}`
-      );
+      throw getChunkSizeError(this.chunkSize, {
+        maxChunkSize: this.maxChunkSize,
+        minChunkSize: this.minChunkSize,
+      });
     }
     if (
       this.maxChunkSize &&
@@ -245,38 +421,23 @@ export class UpChunk  {
     });
   }
 
-  /**
-   * Get portion of the file of x bytes corresponding to chunkSize
-   */
-  private getChunk() {
-    return new Promise<void> ((resolve) => {
-      // Since we start with 0-chunkSize for the range, we need to subtract 1.
-      const length =
-        this.totalChunks === 1 ? this.file.size : this.chunkByteSize;
-
-      this.reader.onload = () => {
-        if (this.reader.result !== null) {
-          this.chunk = new Blob([this.reader.result], {
-            type: 'application/octet-stream',
-          });
-        }
-        resolve();
-      };
-
-      this.reader.readAsArrayBuffer(this.file.slice(this.nextChunkRangeStart, this.nextChunkRangeStart + length));
-    });
-  }
-
   private xhrPromise(options: XhrUrlConfig): Promise<XhrResponse> {
     const beforeSend = (xhrObject: XMLHttpRequest) => {
       xhrObject.upload.onprogress = (event: ProgressEvent) => {
         const remainingChunks = this.totalChunks - this.chunkCount;
         // const remainingBytes = this.file.size-(this.nextChunkRangeStart+event.loaded);
-        const percentagePerChunk = (this.file.size-this.nextChunkRangeStart)/this.file.size/remainingChunks;
-        const successfulPercentage = this.nextChunkRangeStart/this.file.size;
-        const currentChunkProgress = event.loaded / (event.total ?? this.chunkByteSize);
+        const percentagePerChunk =
+          (this.file.size - this.nextChunkRangeStart) /
+          this.file.size /
+          remainingChunks;
+        const successfulPercentage = this.nextChunkRangeStart / this.file.size;
+        const currentChunkProgress =
+          event.loaded / (event.total ?? this.chunkByteSize);
         const chunkPercentage = currentChunkProgress * percentagePerChunk;
-        this.dispatch('progress', Math.min((successfulPercentage + chunkPercentage)*100, 100));
+        this.dispatch(
+          'progress',
+          Math.min((successfulPercentage + chunkPercentage) * 100, 100)
+        );
       };
     };
 
@@ -295,9 +456,9 @@ export class UpChunk  {
   /**
    * Send chunk of the file with appropriate headers
    */
-  protected async sendChunk() {
+  protected async sendChunk(chunk: Blob) {
     const rangeStart = this.nextChunkRangeStart;
-    const rangeEnd = rangeStart + this.chunk.size - 1;
+    const rangeEnd = rangeStart + chunk.size - 1;
     const headers = {
       ...this.headers,
       'Content-Type': this.file.type,
@@ -310,20 +471,75 @@ export class UpChunk  {
       chunkSize: this.chunkSize,
     });
 
+    // console.log('sending chunk');
     return this.xhrPromise({
       headers,
       url: this.endpointValue,
       method: this.method,
-      body: this.chunk,
+      body: chunk,
     });
   }
 
-  /**
-   * Called on net failure. If retry counter !== 0, retry after delayBeforeAttempt
-   */
-  private manageRetries() {
-    if (this.attemptCount < this.attempts) {
-      setTimeout(() => this.sendChunks(), this.delayBeforeAttempt * 1000);
+  protected async sendChunkWithRetries(chunk: Blob): Promise<boolean> {
+    // What to do if a chunk was successfully uploaded
+    const successfulChunkUploadCb = async (res: XhrResponse, _chunk?: Blob) => {
+      // Side effects
+      const lastChunkEnd = new Date();
+      const lastChunkInterval =
+        (lastChunkEnd.getTime() - this.lastChunkStart.getTime()) / 1000;
+
+      this.dispatch('chunkSuccess', {
+        chunk: this.chunkCount,
+        chunkSize: this.chunkSize,
+        attempts: this.attemptCount,
+        timeInterval: lastChunkInterval,
+        response: res,
+      });
+
+      this.attemptCount = 0;
+      this.chunkCount = (this.chunkCount ?? 0) + 1;
+      this.nextChunkRangeStart = this.nextChunkRangeStart + this.chunkByteSize;
+      if (this.dynamicChunkSize) {
+        let unevenChunkSize = this.chunkSize;
+        if (lastChunkInterval < 10) {
+          unevenChunkSize = Math.min(this.chunkSize * 2, this.maxChunkSize);
+        } else if (lastChunkInterval > 30) {
+          unevenChunkSize = Math.max(this.chunkSize / 2, this.minChunkSize);
+        }
+        // ensure it's a multiple of 256k
+        this.chunkSize = Math.ceil(unevenChunkSize / 256) * 256;
+
+        // Re-estimate the total number of chunks, by adding the completed
+        // chunks to the remaining chunks
+        const remainingChunks =
+          (this.file.size - this.nextChunkRangeStart) / this.chunkByteSize;
+        this.totalChunks = Math.ceil(this.chunkCount + remainingChunks);
+      }
+
+      return true;
+    };
+
+    // What to do if a chunk upload failed, potentially after retries
+    const failedChunkUploadCb = async (res: XhrResponse, _chunk?: Blob) => {
+      // Side effects
+      this.dispatch('error', {
+        message: `Server responded with ${
+          (res as XhrResponse).statusCode
+        }. Stopping upload.`,
+        chunk: this.chunkCount,
+        attempts: this.attemptCount,
+      });
+
+      return false;
+    };
+
+    // What to do if a chunk upload failed but is retriable and hasn't exceeded retry
+    // count
+    const retriableChunkUploadCb = async (
+      _res: XhrResponse | undefined,
+      _chunk?: Blob
+    ) => {
+      // Side effects
       this.dispatch('attemptFailure', {
         message: `An error occured uploading chunk ${this.chunkCount}. ${
           this.attempts - this.attemptCount
@@ -331,101 +547,82 @@ export class UpChunk  {
         chunkNumber: this.chunkCount,
         attemptsLeft: this.attempts - this.attemptCount,
       });
-      return;
-    }
 
-    this.dispatch('error', {
-      message: `An error occured uploading chunk ${this.chunkCount}. No more retries, stopping upload`,
-      chunk: this.chunkCount,
-      attempts: this.attemptCount,
-    });
+      return new Promise<boolean>((resolve) => {
+        setTimeout(async () => {
+          // Handle mid-flight _paused/offline cases here by storing the
+          // "still retriable but yet to be uploaded chunk" in state.
+          // See also: `sendChunks()`
+          if (this._paused || this.offline) {
+            this.pendingChunk = chunk;
+            resolve(false);
+            return;
+          }
+          const chunkUploadSuccess = await this.sendChunkWithRetries(chunk);
+          resolve(chunkUploadSuccess);
+        }, this.delayBeforeAttempt * 1000);
+      });
+    };
+
+    let res: XhrResponse | undefined;
+    try {
+      this.attemptCount = this.attemptCount + 1;
+      this.lastChunkStart = new Date();
+      res = await this.sendChunk(chunk);
+    } catch (_err) {
+      console.warn('DEBUG: Caught an error: %j', _err);
+      // this type of error can happen after network disconnection on CORS setup
+    }
+    const options = {
+      retryCodes: this.retryCodes,
+      attemptCount: this.attemptCount,
+      attempts: this.attempts,
+    };
+    // console.log('res', res, 'options', options);
+    if (isSuccessfulChunkUpload(res, options)) {
+      return await successfulChunkUploadCb(res, chunk);
+    }
+    if (isFailedChunkUpload(res, options)) {
+      return await failedChunkUploadCb(res, chunk);
+    }
+    // Retriable case
+    return await retriableChunkUploadCb(res, chunk);
   }
+
+  /**
+   * Called on net failure. If retry counter !== 0, retry after delayBeforeAttempt
+   */
 
   /**
    * Manage the whole upload by calling getChunk & sendChunk
    * handle errors & retries and dispatch events
    */
-  private sendChunks() {
-    if (this._paused || this.offline || this.success) {
-      return;
+  private async sendChunks() {
+    // A "pending chunk" is a chunk that was unsuccessful but still retriable when
+    // uploading was _paused or the env is offline. Since this may be the last
+    if (this.pendingChunk && !(this._paused || this.offline)) {
+      const chunk = this.pendingChunk;
+      this.pendingChunk = undefined;
+      await this.sendChunkWithRetries(chunk);
     }
 
-    this.getChunk()
-      .then(() => {
-        this.attemptCount = this.attemptCount + 1;
-        this.lastChunkStart = new Date();
-        return this.sendChunk()
-      })
-      .then((res) => {
-        if (SUCCESSFUL_CHUNK_UPLOAD_CODES.includes(res.statusCode)) {
-          const lastChunkEnd = new Date();
-          const lastChunkInterval = (lastChunkEnd.getTime() - this.lastChunkStart.getTime()) / 1000;
-
-          this.dispatch('chunkSuccess', {
-            chunk: this.chunkCount,
-            chunkSize: this.chunkSize,
-            attempts: this.attemptCount,
-            timeInterval: lastChunkInterval,
-            response: res,
-          });
-
-          this.attemptCount = 0;
-          this.chunkCount = this.chunkCount + 1;
-          this.nextChunkRangeStart = this.nextChunkRangeStart + this.chunkByteSize;
-
-          if (this.chunkCount < this.totalChunks) {
-            // dynamic chunk sizing
-            if (this.dynamicChunkSize) {
-              if (lastChunkInterval < 10)
-              {
-                this.chunkSize = Math.min(this.chunkSize * 2,this.maxChunkSize);
-              } else if (lastChunkInterval > 30) {
-                this.chunkSize = Math.max(this.chunkSize / 2,this.minChunkSize);
-              }
-              // ensure it's a multiple of 256k
-              this.chunkSize = Math.ceil(this.chunkSize / 256) * 256;
-
-              // Now update the new chunkByteSize to the newly calculated chunk size
-              this.chunkByteSize = this.chunkSize * 1024;
-
-              // Re-estimate the total number of chunks, by adding the completed
-              // chunks to the remaining chunks
-              const remainingChunks = (this.file.size-this.nextChunkRangeStart)/this.chunkByteSize;
-              this.totalChunks = Math.ceil(this.chunkCount + remainingChunks);
-            }
-            this.sendChunks();
-          } else {
-            this.success = true;
-            this.dispatch('success');
-          }
-
-        } else if (this.retryCodes.includes(res.statusCode)) {
-          if (this._paused || this.offline) {
-            return;
-          }
-          // console.warn('DEBUG: Caught a temporary error: %j',res);
-          this.manageRetries();
-        } else {
-          if (this._paused || this.offline) {
-            return;
-          }
-
-          this.dispatch('error', {
-            message: `Server responded with ${res.statusCode}. Stopping upload.`,
-            chunkNumber: this.chunkCount,
-            attempts: this.attemptCount,
-          });
-        }
-      })
-      .catch((err) => {
-        if (this._paused || this.offline) {
-          return;
-        }
-
-        // console.warn('DEBUG: Caught an error: %j',err);
-        // this type of error can happen after network disconnection on CORS setup
-        this.manageRetries();
-      });
+    while (!(this.success || this._paused || this.offline)) {
+      const { value: chunk, done } = await this.chunkedStreamIterator.next();
+      let chunkUploadSuccess;
+      if (chunk) {
+        chunkUploadSuccess = await this.sendChunkWithRetries(chunk);
+      }
+      // NOTE: Need to disambiguate "last chunk to upload" (done) vs. "successfully"
+      // uploaded last chunk to upload" (depends on status of sendChunkWithRetries),
+      // specifically for "pending chunk" cases for the last chunk.
+      this.success = !!done;
+      if (this.success) {
+        this.dispatch('success');
+      }
+      if (!chunkUploadSuccess) {
+        return;
+      }
+    }
   }
 }
 
