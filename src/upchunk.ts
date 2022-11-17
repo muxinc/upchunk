@@ -471,7 +471,6 @@ export class UpChunk {
       chunkSize: this.chunkSize,
     });
 
-    // console.log('sending chunk');
     return this.xhrPromise({
       headers,
       url: this.endpointValue,
