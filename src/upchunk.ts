@@ -5,6 +5,7 @@ const DEFAULT_CHUNK_SIZE = 30720;
 const DEFAULT_MAX_CHUNK_SIZE = 512000; // in kB
 const DEFAULT_MIN_CHUNK_SIZE = 256; // in kB
 
+// Predicate function that returns true if a given `chunkSize` is valid, otherwise false.
 export const isValidChunkSize = (
   chunkSize: any,
   {
@@ -22,6 +23,7 @@ export const isValidChunkSize = (
   );
 };
 
+// Projection function that returns an error associated with invalid `chunkSize` values.
 export const getChunkSizeError = (
   chunkSize: any,
   {
@@ -40,6 +42,9 @@ export type ChunkedStreamIterableOptions = {
   maxChunkSize?: number;
 };
 
+// An Iterable that accepts a readableStream of binary data (Blob | Uint8Array) and provides
+// an asyncIterator which yields Blob values of the current chunkSize until done. Note that
+// chunkSize may change between iterations.
 export class ChunkedStreamIterable implements AsyncIterable<Blob> {
   protected defaultChunkSize: number;
   public readonly minChunkSize: number;
@@ -299,6 +304,20 @@ export class UpChunk {
    */
   public on(eventName: EventName, fn: (event: CustomEvent) => void) {
     this.eventTarget.addEventListener(eventName, fn as EventListener);
+  }
+
+  /**
+   * Subscribe to an event once
+   */
+  public once(eventName: EventName, fn: (event: CustomEvent) => void) {
+    this.eventTarget.addEventListener(eventName, fn as EventListener, { once: true });
+  }
+
+  /**
+   * Unsubscribe to an event
+   */
+  public off(eventName: EventName, fn: (event: CustomEvent) => void) {
+    this.eventTarget.removeEventListener(eventName, fn as EventListener);
   }
 
   public get paused() {
@@ -589,10 +608,6 @@ export class UpChunk {
   }
 
   /**
-   * Called on net failure. If retry counter !== 0, retry after delayBeforeAttempt
-   */
-
-  /**
    * Manage the whole upload by calling getChunk & sendChunk
    * handle errors & retries and dispatch events
    */
@@ -602,12 +617,17 @@ export class UpChunk {
     if (this.pendingChunk && !(this._paused || this.offline)) {
       const chunk = this.pendingChunk;
       this.pendingChunk = undefined;
-      await this.sendChunkWithRetries(chunk);
+      const chunkUploadSuccess = await this.sendChunkWithRetries(chunk);
+      if (this.success && chunkUploadSuccess) {
+        this.dispatch('success');
+      }
     }
 
     while (!(this.success || this._paused || this.offline)) {
       const { value: chunk, done } = await this.chunkedStreamIterator.next();
-      let chunkUploadSuccess;
+      // NOTE: When `done`, `chunk` is undefined, so default `chunkUploadSuccess` 
+      // to be `true` on this condition, otherwise `false`.
+      let chunkUploadSuccess = !chunk && done;
       if (chunk) {
         chunkUploadSuccess = await this.sendChunkWithRetries(chunk);
       }
@@ -615,7 +635,7 @@ export class UpChunk {
       // uploaded last chunk to upload" (depends on status of sendChunkWithRetries),
       // specifically for "pending chunk" cases for the last chunk.
       this.success = !!done;
-      if (this.success) {
+      if (this.success && chunkUploadSuccess) {
         this.dispatch('success');
       }
       if (!chunkUploadSuccess) {
