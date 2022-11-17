@@ -263,48 +263,6 @@ describe('integration', () => {
     });
   });
 
-  it('should have identical bytes after chunked upload', (done) => {
-    let uploadedBlob = new Blob();
-    let uploadCount = 0;
-    xhrMock.put(endpoint, (req, res) => {
-      uploadCount = uploadCount + 1;
-      uploadedBlob = new Blob([uploadedBlob, req.body()]);
-      return res.status(200);
-    });
-    // Make an Array of random bytes to better validate test case
-    const fileBytesBuffers = Array.from(
-      { length: (1048576 * 32) / 65536 },
-      () => new Int32Array(65536 / 32)
-    );
-    fileBytesBuffers.forEach((buffer) => crypto.getRandomValues(buffer));
-    const fileBlob = new Blob(fileBytesBuffers);
-    const upload = createUploadFixture(
-      {
-        headers: {
-          // NOTE: Adding this as an arbitrary value to cause xhr-mock to cause progress events to be dispatched.
-          // See: https://www.npmjs.com/package/xhr-mock#upload-progress
-          'Content-Length': '1',
-        },
-        chunkSize: 256,
-      },
-      new File([fileBlob], 'test.mp4')
-    );
-
-    upload.on('error', (err) => {
-      done(err);
-    });
-
-    upload.on('success', () => {
-      // Asserting this to make sure we're testing truly chunked uploads
-      expect(uploadCount).to.be.greaterThan(1);
-      expect(uploadedBlob).to.deep.equal(
-        fileBlob,
-        'Uploaded file data should be identical to upchunk file data'
-      );
-      done();
-    });
-  });
-
   it('abort pauses the upload and cancels the current XHR request', (done) => {
     let upload: UpChunk;
     let attemptCt = 0;
@@ -336,5 +294,146 @@ describe('integration', () => {
       expect(upload.paused).to.be.true;
       done();
     }, 50);
+  });
+
+  describe('upload validation', () => {
+    it('should have identical bytes after chunked upload', (done) => {
+      let uploadedBlob = new Blob();
+      let uploadCount = 0;
+      xhrMock.put(endpoint, (req, res) => {
+        uploadCount = uploadCount + 1;
+        uploadedBlob = new Blob([uploadedBlob, req.body()]);
+        return res.status(200);
+      });
+      // Make an Array of random bytes to better validate test case
+      const fileBytesBuffers = Array.from(
+        { length: (1048576 * 32) / 65536 },
+        () => new Int32Array(65536 / 32)
+      );
+      fileBytesBuffers.forEach((buffer) => crypto.getRandomValues(buffer));
+      const fileBlob = new Blob(fileBytesBuffers);
+      const upload = createUploadFixture(
+        {
+          headers: {
+            // NOTE: Adding this as an arbitrary value to cause xhr-mock to cause progress events to be dispatched.
+            // See: https://www.npmjs.com/package/xhr-mock#upload-progress
+            'Content-Length': '1',
+          },
+          chunkSize: 256,
+        },
+        new File([fileBlob], 'test.mp4')
+      );
+
+      upload.on('error', (err) => {
+        done(err);
+      });
+
+      upload.on('success', () => {
+        // Asserting this to make sure we're testing truly chunked uploads
+        expect(uploadCount).to.be.greaterThan(1);
+        expect(uploadedBlob).to.deep.equal(
+          fileBlob,
+          'Uploaded file data should be identical to upchunk file data'
+        );
+        done();
+      });
+    });
+
+    it('should have identical bytes after chunked upload, even for dynamic uploads', (done) => {
+      let uploadedBlob = new Blob();
+      let uploadCount = 0;
+      xhrMock.put(endpoint, (req, res) => {
+        uploadCount = uploadCount + 1;
+        uploadedBlob = new Blob([uploadedBlob, req.body()]);
+        return res.status(200);
+      });
+      // Make an Array of random bytes to better validate test case
+      const fileBytesBuffers = Array.from(
+        { length: (1048576 * 32) / 65536 },
+        () => new Int32Array(65536 / 32)
+      );
+      fileBytesBuffers.forEach((buffer) => crypto.getRandomValues(buffer));
+      const fileBlob = new Blob(fileBytesBuffers);
+      const upload = createUploadFixture(
+        {
+          headers: {
+            // NOTE: Adding this as an arbitrary value to cause xhr-mock to cause progress events to be dispatched.
+            // See: https://www.npmjs.com/package/xhr-mock#upload-progress
+            'Content-Length': '1',
+          },
+          chunkSize: 256,
+          dynamicChunkSize: true,
+        },
+        new File([fileBlob], 'test.mp4')
+      );
+
+      upload.on('error', (err) => {
+        done(err);
+      });
+
+      upload.on('success', () => {
+        // Asserting this to make sure we're testing truly chunked uploads
+        expect(uploadCount).to.be.greaterThan(1);
+        expect(uploadedBlob).to.deep.equal(
+          fileBlob,
+          'Uploaded file data should be identical to upchunk file data'
+        );
+        done();
+      });
+    });
+
+    it('should have identical bytes after chunked upload, even after pause() and resume() on last segment', (done) => {
+      let uploadedBlob = new Blob();
+      let uploadCount = 0;
+      const expectedUploadCount = 16;
+      xhrMock.put(endpoint, (req, res) => {
+        uploadCount = uploadCount + 1;
+        uploadedBlob = new Blob([uploadedBlob, req.body()]);
+        // Pause between the penultimate and final chunk
+        if (uploadCount === expectedUploadCount - 1) {
+          upload.pause();
+          upload.once('chunkSuccess', () => {
+            // Wait a bit, then resume uploads
+            setTimeout(() => {
+              upload.resume();
+            }, 50);
+          })
+        }
+        return res.status(200);
+      });
+      // Make an Array of random bytes to better validate test case
+      const fileBytesBuffers = Array.from(
+        { length: (1048576 * 32) / 65536 },
+        () => new Int32Array(65536 / 32)
+      );
+      fileBytesBuffers.forEach((buffer) => crypto.getRandomValues(buffer));
+      const fileBlob = new Blob(fileBytesBuffers);
+      const upload = createUploadFixture(
+        {
+          headers: {
+            // NOTE: Adding this as an arbitrary value to cause xhr-mock to cause progress events to be dispatched.
+            // See: https://www.npmjs.com/package/xhr-mock#upload-progress
+            'Content-Length': '1',
+          },
+          chunkSize: 256,
+        },
+        new File([fileBlob], 'test.mp4')
+      );
+
+      upload.on('error', (err) => {
+        done(err);
+      });
+
+      upload.on('success', () => {
+        // Since this test relies on an exact number of upload requests, asserting
+        // here.
+        expect(uploadCount).to.equal(expectedUploadCount);
+        expect(uploadedBlob).to.deep.equal(
+          fileBlob,
+          'Uploaded file data should be identical to upchunk file data'
+        );
+        done();
+      });
+    });
   });
 });
