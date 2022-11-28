@@ -252,6 +252,8 @@ export class UpChunk {
     this.chunkedStreamIterator =
       this.chunkedStreamIterable[Symbol.asyncIterator]();
 
+    this.totalChunks = Math.ceil(this.file.size / this.chunkByteSize);
+
     this.eventTarget = new EventTarget();
 
     this.validateOptions();
