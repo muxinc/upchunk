@@ -6,6 +6,9 @@ const DEFAULT_MAX_CHUNK_SIZE = 512000; // in kB
 const DEFAULT_MIN_CHUNK_SIZE = 256; // in kB
 
 // Predicate function that returns true if a given `chunkSize` is valid, otherwise false.
+// For `chunkSize` validity, we constrain by a min/max chunk size and conform to GCS:
+// "The chunk size should be a multiple of 256 KiB (256 x 1024 bytes), unless it's the last 
+// chunk that completes the upload." (See: https://cloud.google.com/storage/docs/performing-resumable-uploads)
 export const isValidChunkSize = (
   chunkSize: any,
   {
@@ -46,6 +49,7 @@ export type ChunkedStreamIterableOptions = {
 // an asyncIterator which yields Blob values of the current chunkSize until done. Note that
 // chunkSize may change between iterations.
 export class ChunkedStreamIterable implements AsyncIterable<Blob> {
+  protected _chunkSize: number | undefined;
   protected defaultChunkSize: number;
   public readonly minChunkSize: number;
   public readonly maxChunkSize: number;
@@ -61,8 +65,6 @@ export class ChunkedStreamIterable implements AsyncIterable<Blob> {
     this.minChunkSize = options.minChunkSize ?? DEFAULT_MIN_CHUNK_SIZE;
     this.maxChunkSize = options.maxChunkSize ?? DEFAULT_MAX_CHUNK_SIZE;
   }
-
-  protected _chunkSize: number | undefined;
 
   get chunkSize() {
     return this._chunkSize ?? this.defaultChunkSize;
@@ -588,7 +590,6 @@ export class UpChunk {
       this.lastChunkStart = new Date();
       res = await this.sendChunk(chunk);
     } catch (_err) {
-      console.warn('DEBUG: Caught an error: %j', _err);
       // this type of error can happen after network disconnection on CORS setup
     }
     const options = {
@@ -596,7 +597,6 @@ export class UpChunk {
       attemptCount: this.attemptCount,
       attempts: this.attempts,
     };
-    // console.log('res', res, 'options', options);
     if (isSuccessfulChunkUpload(res, options)) {
       return await successfulChunkUploadCb(res, chunk);
     }
