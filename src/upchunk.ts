@@ -598,13 +598,13 @@ export class UpChunk {
       attempts: this.attempts,
     };
     if (isSuccessfulChunkUpload(res, options)) {
-      return await successfulChunkUploadCb(res, chunk);
+      return successfulChunkUploadCb(res, chunk);
     }
     if (isFailedChunkUpload(res, options)) {
-      return await failedChunkUploadCb(res, chunk);
+      return failedChunkUploadCb(res, chunk);
     }
     // Retriable case
-    return await retriableChunkUploadCb(res, chunk);
+    return retriableChunkUploadCb(res, chunk);
   }
 
   /**
