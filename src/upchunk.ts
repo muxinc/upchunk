@@ -1,5 +1,8 @@
 import { EventTarget, Event } from 'event-target-shim';
-import xhr, { type XhrUrlConfig, type XhrHeaders, type XhrResponse } from 'xhr';
+import xhr from 'xhr';
+// NOTE: Need duplicate imports for Typescript version compatibility reasons (CJP)
+/* tslint:disable-next-line no-duplicate-imports */
+import type { XhrUrlConfig, XhrHeaders, XhrResponse } from 'xhr';
 
 const DEFAULT_CHUNK_SIZE = 30720;
 const DEFAULT_MAX_CHUNK_SIZE = 512000; // in kB
