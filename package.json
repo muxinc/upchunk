@@ -1,6 +1,6 @@
 {
   "name": "@mux/upchunk",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "description": "Dead simple chunked file uploads using Fetch",
   "main": "dist/upchunk.js",
   "module": "dist/upchunk.mjs",
