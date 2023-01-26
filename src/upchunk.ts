@@ -283,11 +283,11 @@ export class UpChunk {
   }
 
   protected get maxChunkSize() {
-    return this.chunkedStreamIterable?.chunkSize ?? DEFAULT_MAX_CHUNK_SIZE;
+    return this.chunkedStreamIterable?.maxChunkSize ?? DEFAULT_MAX_CHUNK_SIZE;
   }
 
   protected get minChunkSize() {
-    return this.chunkedStreamIterable?.chunkSize ?? DEFAULT_MIN_CHUNK_SIZE;
+    return this.chunkedStreamIterable?.minChunkSize ?? DEFAULT_MIN_CHUNK_SIZE;
   }
 
   public get chunkSize() {
