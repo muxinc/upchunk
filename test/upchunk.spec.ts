@@ -296,6 +296,60 @@ describe('integration', () => {
     }, 50);
   });
 
+  it('uses given headers', (done) => {
+    let requestHeaders = {};
+    xhrMock.put(endpoint, (req, res) => {
+      requestHeaders = req.headers();
+      return res.status(200);
+    });
+
+    const upload = createUploadFixture({
+      headers: { 'Authorization': 'Bearer token' },
+    });
+
+    upload.on('error', (err) => done(err));
+    upload.on('success', () => {
+      expect(requestHeaders).to.include({ 'authorization': 'Bearer token' });
+      done();
+    });
+  });
+
+  it('uses headers from headers function', (done) => {
+    let requestHeaders = {};
+    xhrMock.put(endpoint, (req, res) => {
+      requestHeaders = req.headers();
+      return res.status(200);
+    });
+
+    const upload = createUploadFixture({
+      headers: () => { return { 'Authorization': 'Bearer token' } },
+    });
+
+    upload.on('error', (err) => done(err));
+    upload.on('success', () => {
+      expect(requestHeaders).to.include({ 'authorization': 'Bearer token' });
+      done();
+    });
+  });
+
+  it('uses headers from headers function returning a promise', (done) => {
+    let requestHeaders = {};
+    xhrMock.put(endpoint, (req, res) => {
+      requestHeaders = req.headers();
+      return res.status(200);
+    });
+
+    const upload = createUploadFixture({
+      headers: () => Promise.resolve({ 'Authorization': 'Bearer token' }),
+    });
+
+    upload.on('error', (err) => done(err));
+    upload.on('success', () => {
+      expect(requestHeaders).to.include({ 'authorization': 'Bearer token' });
+      done();
+    });
+  });
+
   describe('upload validation', () => {
     it('should have identical bytes after chunked upload', (done) => {
       let uploadedBlob = new Blob();

@@ -165,9 +165,9 @@ Returns an instance of `UpChunk` and begins uploading the specified `File`.
 
   The file you'd like to upload. For example, you might just want to use the file from an input with a type of "file".
 
-- `headers` <small>type: `Object`</small>
+- `headers` <small>type: `Object` | `function`</small>
 
-  An object with any headers you'd like included with the `PUT` request for each chunk.
+  An object, a function that returns an object, or a function that returns a promise of an object. The resulting object contains any headers you'd like included with the `PUT` request for each chunk.
 
 - `chunkSize` <small>type: `integer`, default:`30720`</small>
 

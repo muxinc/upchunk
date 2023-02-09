@@ -37,6 +37,13 @@ describe('option validation', () => {
     expect(upload).to.be.an.instanceOf(UpChunk);
   });
 
+  it('accepts a function that returns headers', () => {
+    const upload = createUpload(
+      buildParams({ headers: (() => {}) })
+    );
+    expect(upload).to.be.an.instanceOf(UpChunk);
+  })
+
   describe('throws', () => {
     it('endpoint is not included', () => {
       const params = buildParams({ endpoint: undefined });
