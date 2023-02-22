@@ -189,7 +189,7 @@ export interface UpChunkOptions {
   endpoint: string | ((file?: File) => Promise<string>);
   file: File;
   method?: AllowedMethods;
-  headers?: XhrHeaders;
+  headers?: XhrHeaders | (() => XhrHeaders) | (() => Promise<XhrHeaders>);
   maxFileSize?: number;
   chunkSize?: number;
   attempts?: number;
@@ -203,7 +203,7 @@ export interface UpChunkOptions {
 export class UpChunk {
   public endpoint: string | ((file?: File) => Promise<string>);
   public file: File;
-  public headers: XhrHeaders;
+  public headers: XhrHeaders | (() => XhrHeaders) | (() => Promise<XhrHeaders>);
   public method: AllowedMethods;
   public attempts: number;
   public delayBeforeAttempt: number;
@@ -374,8 +374,8 @@ export class UpChunk {
     if (!(this.file instanceof File)) {
       throw new TypeError('file must be a File object');
     }
-    if (this.headers && typeof this.headers !== 'object') {
-      throw new TypeError('headers must be null or an object');
+    if (this.headers && typeof this.headers !== 'function' && typeof this.headers !== 'object') {
+      throw new TypeError('headers must be null, an object, or a function that returns an object or a promise');
     }
     if (
       !isValidChunkSize(this.chunkSize, {
@@ -485,8 +485,10 @@ export class UpChunk {
   protected async sendChunk(chunk: Blob) {
     const rangeStart = this.nextChunkRangeStart;
     const rangeEnd = rangeStart + chunk.size - 1;
+    const extraHeaders = await (typeof this.headers === 'function' ? this.headers() : this.headers);
+
     const headers = {
-      ...this.headers,
+      ...extraHeaders,
       'Content-Type': this.file.type,
       'Content-Range': `bytes ${rangeStart}-${rangeEnd}/${this.file.size}`,
     };
