@@ -1,7 +1,7 @@
 <p align="center">
   <a href="https://mux.com/">
     <img src="https://avatars.githubusercontent.com/u/16199997?s=200&v=4" alt="Mux Logo">
-    <h1 align="center">stream.new</h1>
+    <h1 align="center">UpChunk</h1>
   </a>
 </p>
 
