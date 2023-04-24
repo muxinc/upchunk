@@ -11,8 +11,6 @@
 
 <img src="https://github.com/muxinc/upchunk/workflows/CI/badge.svg" alt="Build Status">
 
-# UpChunk
-
 UpChunk uploads chunks of files! It's a JavaScript module for handling large file uploads via chunking and making a `put` request for each chunk with the correct range request headers. Uploads can be paused and resumed, they're fault tolerant,
 and it should work just about anywhere.
 
