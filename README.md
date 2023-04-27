@@ -1,6 +1,15 @@
-![UpChunk](banner.png)
+<p align="center">
+  <a href="https://mux.com/">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://user-images.githubusercontent.com/360826/233653989-11cd8603-c20f-4008-8bf7-dc15b743c52b.svg">
+      <source media="(prefers-color-scheme: light)" srcset="https://user-images.githubusercontent.com/360826/233653583-50dda726-cbe7-4182-a113-059a91ae83e6.svg">
+      <img alt="Mux Logo" src="https://user-images.githubusercontent.com/360826/233653583-50dda726-cbe7-4182-a113-059a91ae83e6.svg">
+    </picture>
+    <h1 align="center">UpChunk</h1>
+  </a>
+</p>
 
-# UpChunk <img src="https://github.com/muxinc/upchunk/workflows/CI/badge.svg" alt="Build Status">
+<img src="https://github.com/muxinc/upchunk/workflows/CI/badge.svg" alt="Build Status">
 
 UpChunk uploads chunks of files! It's a JavaScript module for handling large file uploads via chunking and making a `put` request for each chunk with the correct range request headers. Uploads can be paused and resumed, they're fault tolerant,
 and it should work just about anywhere.
