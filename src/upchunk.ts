@@ -10,7 +10,7 @@ const DEFAULT_MIN_CHUNK_SIZE = 256; // in kB
 
 // Predicate function that returns true if a given `chunkSize` is valid, otherwise false.
 // For `chunkSize` validity, we constrain by a min/max chunk size and conform to GCS:
-// "The chunk size should be a multiple of 256 KiB (256 x 1024 bytes), unless it's the last 
+// "The chunk size should be a multiple of 256 KiB (256 x 1024 bytes), unless it's the last
 // chunk that completes the upload." (See: https://cloud.google.com/storage/docs/performing-resumable-uploads)
 export const isValidChunkSize = (
   chunkSize: any,
@@ -201,6 +201,10 @@ export interface UpChunkOptions {
 }
 
 export class UpChunk {
+  public static createUpload(options: UpChunkOptions) {
+    return new UpChunk(options);
+  }
+
   public endpoint: string | ((file?: File) => Promise<string>);
   public file: File;
   public headers: XhrHeaders | (() => XhrHeaders) | (() => Promise<XhrHeaders>);
@@ -632,7 +636,7 @@ export class UpChunk {
 
     while (!(this.success || this._paused || this.offline)) {
       const { value: chunk, done } = await this.chunkedStreamIterator.next();
-      // NOTE: When `done`, `chunk` is undefined, so default `chunkUploadSuccess` 
+      // NOTE: When `done`, `chunk` is undefined, so default `chunkUploadSuccess`
       // to be `true` on this condition, otherwise `false`.
       let chunkUploadSuccess = !chunk && done;
       if (chunk) {
@@ -652,4 +656,4 @@ export class UpChunk {
   }
 }
 
-export const createUpload = (options: UpChunkOptions) => new UpChunk(options);
+export const createUpload = UpChunk.createUpload;
