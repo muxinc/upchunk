@@ -656,4 +656,6 @@ export class UpChunk {
   }
 }
 
-export const createUpload = UpChunk.createUpload;
+export function createUpload(options: UpChunkOptions) {
+  return new UpChunk(options);
+}
