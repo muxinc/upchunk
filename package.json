@@ -36,11 +36,11 @@
     "tslint-check": "tslint-config-prettier-check ./tslint.json",
     "build:test": "esbuild ./test/deps/xhr-mock.ts ./test/deps/xhr.ts --target=es2019 --format=esm --bundle --minify --outdir=./test/dist --out-extension:.js=.mjs",
     "start": "esbuild      src/upchunk.ts --target=es2019 --format=iife --bundle --sourcemap --outdir=./example --global-name=UpChunk --servedir=example",
-    "build:iife": "esbuild src/upchunk.ts --target=es2019 --format=iife --bundle --minify --sourcemap --outdir=./dist    --global-name=UpChunk",
-    "build:esm": "esbuild  src/upchunk.ts --target=es2019 --format=esm  --bundle --minify --sourcemap --outdir=./dist --out-extension:.js=.mjs",
+    "build:umd": "node ./esbuild-umd.mjs",
+    "build:esm": "esbuild  src/upchunk.ts --target=es2019 --format=esm  --bundle --sourcemap --outdir=./dist --out-extension:.js=.mjs",
     "build:cjs": "esbuild  src/upchunk.ts --target=es2019 --format=cjs  --bundle --minify --sourcemap --outdir=./dist --out-extension:.js=.cjs.js",
     "build:types": "tsc --declaration --emitDeclarationOnly --outDir './dist'",
-    "build:all": "npm-run-all --parallel build:types build:esm build:cjs build:iife",
+    "build:all": "npm-run-all --parallel build:types build:esm build:cjs build:umd",
     "build": "yarn clean && yarn lint && yarn build:all && yarn pack"
   },
   "devDependencies": {
@@ -49,6 +49,7 @@
     "@web/dev-server-import-maps": "^0.0.7",
     "@web/test-runner": "^0.15.0",
     "esbuild": "^0.14.47",
+    "esbuild-plugin-umd-wrapper": "^2.0.0",
     "npm-run-all": "^4.1.5",
     "rimraf": "^3.0.2",
     "tslint": "^6.1.2",
