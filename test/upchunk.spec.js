@@ -6,7 +6,7 @@
  */
 
 import { expect } from '@open-wc/testing';
-import { createUpload, UpChunk } from '../src/upchunk';
+import { createUpload, UpChunk, isIncompleteChunkUploadNeedingRetry } from '../src/upchunk';
 
 const fakeFile = () => {
   return new File(['foo'], 'foo.mp4', {
@@ -116,5 +116,46 @@ describe('option validation', () => {
 
       expect(() => createUpload(params)).to.throw(Error);
     });
+  });
+});
+
+describe('isIncompleteChunkUploadNeedingRetry function', () => {
+  const mockXhrResponse = (statusCode, rangeHeader) => ({
+    statusCode,
+    headers: { 'range': rangeHeader }
+  });
+
+  it('returns false for a successful chunk upload', () => {
+    const res = mockXhrResponse(308, 'bytes=0-999');
+    const options = { chunkSize: 1000 };
+
+    expect(isIncompleteChunkUploadNeedingRetry(res, options)).to.be.false;
+  });
+
+  it('returns true for a partial chunk upload', () => {
+    const res = mockXhrResponse(308, 'bytes=0-998');
+    const options = { chunkSize: 1000 };
+
+    expect(isIncompleteChunkUploadNeedingRetry(res, options)).to.be.true;
+  });
+
+  it('returns false for non-308 response codes', () => {
+    const res = mockXhrResponse(200, 'bytes=0-999');
+    const options = { chunkSize: 1000 };
+
+    expect(isIncompleteChunkUploadNeedingRetry(res, options)).to.be.false;
+  });
+
+  it('handles missing or malformed Range header', () => {
+    const res1 = mockXhrResponse(308, null);
+    const res2 = mockXhrResponse(308, 'invalid-range');
+    const res3 = null;
+    const res4 = undefined;
+    const options = { chunkSize: 1000 };
+
+    expect(isIncompleteChunkUploadNeedingRetry(res1, options)).to.be.false;
+    expect(isIncompleteChunkUploadNeedingRetry(res2, options)).to.be.false;
+    expect(isIncompleteChunkUploadNeedingRetry(res3, options)).to.be.false;
+    expect(isIncompleteChunkUploadNeedingRetry(res4, options)).to.be.false;
   });
 });
