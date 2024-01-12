@@ -126,22 +126,24 @@ describe('isIncompleteChunkUploadNeedingRetry function', () => {
   });
 
   it('returns false for a successful chunk upload', () => {
-    const res = mockXhrResponse(308, 'bytes=0-999');
-    const options = { chunkSize: 1000 };
+    const res1 = mockXhrResponse(308, 'bytes=0-999');
+    const res2 = mockXhrResponse(308, 'bytes=500-999');
+    const options = { currentChunkEndByte: 999 };
 
-    expect(isIncompleteChunkUploadNeedingRetry(res, options)).to.be.false;
+    expect(isIncompleteChunkUploadNeedingRetry(res1, options)).to.be.false;
+    expect(isIncompleteChunkUploadNeedingRetry(res2, options)).to.be.false;
   });
 
   it('returns true for a partial chunk upload', () => {
     const res = mockXhrResponse(308, 'bytes=0-998');
-    const options = { chunkSize: 1000 };
+    const options = { currentChunkEndByte: 999 };
 
     expect(isIncompleteChunkUploadNeedingRetry(res, options)).to.be.true;
   });
 
   it('returns false for non-308 response codes', () => {
     const res = mockXhrResponse(200, 'bytes=0-999');
-    const options = { chunkSize: 1000 };
+    const options = { currentChunkEndByte: 999 };
 
     expect(isIncompleteChunkUploadNeedingRetry(res, options)).to.be.false;
   });
@@ -151,7 +153,7 @@ describe('isIncompleteChunkUploadNeedingRetry function', () => {
     const res2 = mockXhrResponse(308, 'invalid-range');
     const res3 = null;
     const res4 = undefined;
-    const options = { chunkSize: 1000 };
+    const options = { currentChunkEndByte: 999 };
 
     expect(isIncompleteChunkUploadNeedingRetry(res1, options)).to.be.false;
     expect(isIncompleteChunkUploadNeedingRetry(res2, options)).to.be.false;
