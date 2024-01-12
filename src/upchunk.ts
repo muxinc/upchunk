@@ -142,6 +142,7 @@ export class ChunkedStreamIterable implements AsyncIterable<Blob> {
 
 const SUCCESSFUL_CHUNK_UPLOAD_CODES = [200, 201, 202, 204, 308];
 const TEMPORARY_ERROR_CODES = [408, 502, 503, 504]; // These error codes imply a chunk may be retried
+const RESUME_INCOMPLETE_CODES = [308];
 
 type UploadPredOptions = {
   retryCodes?: typeof TEMPORARY_ERROR_CODES;
@@ -168,6 +169,31 @@ const isFailedChunkUpload = (
     !(isSuccessfulChunkUpload(res) || isRetriableChunkUpload(res, options))
   );
 };
+
+/**
+ * Checks if an upload chunk was partially received (HTTP 308) and needs a retry.
+ * Validates against the 'Range' header to ensure the full chunk was processed.
+ */
+export const isIncompleteChunkUploadNeedingRetry = (
+  res: XhrResponse | undefined,
+  _options?: any
+): res is XhrResponse => {
+  if (!res || !RESUME_INCOMPLETE_CODES.includes(res.statusCode) || !res.headers['range']) {
+    return false;
+  }
+
+  const range = res.headers['range'].match(/bytes=(\d+)-(\d+)/);
+  if (!range) {
+    return false;
+  }
+
+  const startByte = parseInt(range[1], 10);
+  const endByte = parseInt(range[2], 10);
+  const receivedBytes = endByte - startByte + 1; // +1 because both start and end are inclusive
+
+  return receivedBytes !== _options.chunkSize;
+};
+
 
 type EventName =
   | 'attempt'
@@ -607,7 +633,11 @@ export class UpChunk {
       retryCodes: this.retryCodes,
       attemptCount: this.attemptCount,
       attempts: this.attempts,
+      chunkSize: chunk.size,
     };
+    if (isIncompleteChunkUploadNeedingRetry(res, options)) {
+      return retriableChunkUploadCb(res, chunk);
+    }
     if (isSuccessfulChunkUpload(res, options)) {
       return successfulChunkUploadCb(res, chunk);
     }
