@@ -187,11 +187,8 @@ export const isIncompleteChunkUploadNeedingRetry = (
     return false;
   }
 
-  const startByte = parseInt(range[1], 10);
   const endByte = parseInt(range[2], 10);
-  const receivedBytes = endByte - startByte + 1; // +1 because both start and end are inclusive
-
-  return receivedBytes !== _options.chunkSize;
+  return endByte !== _options.currentChunkEndByte;
 };
 
 
@@ -633,7 +630,7 @@ export class UpChunk {
       retryCodes: this.retryCodes,
       attemptCount: this.attemptCount,
       attempts: this.attempts,
-      chunkSize: chunk.size,
+      currentChunkEndByte: this.nextChunkRangeStart + chunk.size - 1, // end byte is inclusive
     };
     if (isIncompleteChunkUploadNeedingRetry(res, options)) {
       return retriableChunkUploadCb(res, chunk);
