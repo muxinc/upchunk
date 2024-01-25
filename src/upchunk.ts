@@ -582,6 +582,7 @@ export class UpChunk {
         }. Stopping upload.`,
         chunk: this.chunkCount,
         attempts: this.attemptCount,
+        response: res,
       });
 
       return false;
@@ -590,7 +591,7 @@ export class UpChunk {
     // What to do if a chunk upload failed but is retriable and hasn't exceeded retry
     // count
     const retriableChunkUploadCb = async (
-      _res: XhrResponse | undefined,
+      res: XhrResponse | undefined,
       _chunk?: Blob
     ) => {
       // Side effects
@@ -600,6 +601,7 @@ export class UpChunk {
         } retries left.`,
         chunkNumber: this.chunkCount,
         attemptsLeft: this.attempts - this.attemptCount,
+        response: res,
       });
 
       return new Promise<boolean>((resolve) => {
