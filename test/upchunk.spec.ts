@@ -102,6 +102,7 @@ describe('integration', () => {
     const upload = createUploadFixture();
 
     upload.on('error', (err) => {
+      expect(err.detail.response.statusCode).to.equal(500);
       done();
     });
 
@@ -141,6 +142,7 @@ describe('integration', () => {
 
     upload.on('attemptFailure', (err) => {
       upload.pause();
+      expect(err.detail.response.statusCode).to.equal(502);
       done();
     });
   });
