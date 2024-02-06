@@ -49,14 +49,17 @@ You'll need to have a route in your application that returns an upload URL from 
 
 ```javascript
 const Mux = require('@mux/mux-node');
-const { Video } = new Mux();
+const mux = new Mux({
+  tokenId: process.env.MUX_TOKEN_ID,
+  tokenSecret: process.env.MUX_TOKEN_SECRET
+});
 
 module.exports = async (req, res) => {
   // This ultimately just makes a POST request to https://api.mux.com/video/v1/uploads with the supplied options.
-  const upload = await Video.Uploads.create({
+  const upload = await mux.video.uploads.create({
     cors_origin: 'https://your-app.com',
     new_asset_settings: {
-      playback_policy: 'public',
+      playback_policy: ['public'],
     },
   });
 
