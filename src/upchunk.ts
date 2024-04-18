@@ -273,11 +273,11 @@ export class UpChunk {
     this.maxFileBytes = (options.maxFileSize || 0) * 1024;
     this.chunkCount = 0;
     this.attemptCount = 0;
-    if (typeof window !== 'undefined' && !window.navigator.onLine) {
-      this._offline = true;
-    } else {
-      this._offline = false;
-    }
+    // Initialize offline to the current offline state, where
+    // offline is false if
+    // 1. we're not running in the browser (aka window is undefined) -OR-
+    // 2. we're not online (as advertised by navigator.onLine)
+    this._offline = typeof window !== 'undefined' && !window.navigator.onLine;
     this._paused = false;
     this.success = false;
     this.nextChunkRangeStart = 0;
