@@ -4,6 +4,8 @@ import xhr from 'xhr';
 /* tslint:disable-next-line no-duplicate-imports */
 import type { XhrUrlConfig, XhrHeaders, XhrResponse } from 'xhr';
 
+type XhrResponseLike = Partial<XhrResponse> & Pick<XhrResponse, 'statusCode'>;
+
 const DEFAULT_CHUNK_SIZE = 30720;
 const DEFAULT_MAX_CHUNK_SIZE = 512000; // in kB
 const DEFAULT_MIN_CHUNK_SIZE = 256; // in kB
@@ -150,20 +152,20 @@ type UploadPredOptions = {
   attemptCount: number;
 };
 const isSuccessfulChunkUpload = (
-  res: XhrResponse | undefined,
+  res: XhrResponseLike | undefined,
   _options?: any
 ): res is XhrResponse =>
   !!res && SUCCESSFUL_CHUNK_UPLOAD_CODES.includes(res.statusCode);
 
 const isRetriableChunkUpload = (
-  res: XhrResponse | undefined,
+  res: XhrResponseLike | undefined,
   { retryCodes = TEMPORARY_ERROR_CODES }: UploadPredOptions
 ) => !res || retryCodes.includes(res.statusCode);
 
 const isFailedChunkUpload = (
-  res: XhrResponse | undefined,
+  res: XhrResponseLike | undefined,
   options: UploadPredOptions
-): res is XhrResponse => {
+): res is XhrResponseLike => {
   return (
     options.attemptCount >= options.attempts ||
     !(isSuccessfulChunkUpload(res) || isRetriableChunkUpload(res, options))
@@ -175,10 +177,14 @@ const isFailedChunkUpload = (
  * Validates against the 'Range' header to ensure the full chunk was processed.
  */
 export const isIncompleteChunkUploadNeedingRetry = (
-  res: XhrResponse | undefined,
+  res: XhrResponseLike | undefined,
   _options?: any
-): res is XhrResponse => {
-  if (!res || !RESUME_INCOMPLETE_CODES.includes(res.statusCode) || !res.headers['range']) {
+): res is XhrResponseLike => {
+  if (
+    !res ||
+    !RESUME_INCOMPLETE_CODES.includes(res.statusCode) ||
+    !res.headers?.['range']
+  ) {
     return false;
   }
 
@@ -190,7 +196,6 @@ export const isIncompleteChunkUploadNeedingRetry = (
   const endByte = parseInt(range[2], 10);
   return endByte !== _options.currentChunkEndByte;
 };
-
 
 type EventName =
   | 'attempt'
@@ -245,7 +250,7 @@ export class UpChunk {
   private endpointValue: string;
   private totalChunks: number;
   private attemptCount: number;
-  private offline: boolean;
+  private _offline: boolean;
   private _paused: boolean;
   private success: boolean;
   private currentXhr?: XMLHttpRequest;
@@ -268,7 +273,11 @@ export class UpChunk {
     this.maxFileBytes = (options.maxFileSize || 0) * 1024;
     this.chunkCount = 0;
     this.attemptCount = 0;
-    this.offline = false;
+    if (typeof window !== 'undefined' && !window.navigator.onLine) {
+      this._offline = true;
+    } else {
+      this._offline = false;
+    }
     this._paused = false;
     this.success = false;
     this.nextChunkRangeStart = 0;
@@ -293,17 +302,17 @@ export class UpChunk {
     // trigger events when offline/back online
     if (typeof window !== 'undefined') {
       window.addEventListener('online', () => {
-        if (!this.offline) {
-          return;
-        }
+        if (!this.offline) return;
 
-        this.offline = false;
+        this._offline = false;
         this.dispatch('online');
         this.sendChunks();
       });
 
       window.addEventListener('offline', () => {
-        this.offline = true;
+        if (this.offline) return;
+
+        this._offline = true;
         this.dispatch('offline');
       });
     }
@@ -344,7 +353,9 @@ export class UpChunk {
    * Subscribe to an event once
    */
   public once(eventName: EventName, fn: (event: CustomEvent) => void) {
-    this.eventTarget.addEventListener(eventName, fn as EventListener, { once: true });
+    this.eventTarget.addEventListener(eventName, fn as EventListener, {
+      once: true,
+    });
   }
 
   /**
@@ -352,6 +363,10 @@ export class UpChunk {
    */
   public off(eventName: EventName, fn: (event: CustomEvent) => void) {
     this.eventTarget.removeEventListener(eventName, fn as EventListener);
+  }
+
+  public get offline() {
+    return this._offline;
   }
 
   public get paused() {
@@ -373,6 +388,10 @@ export class UpChunk {
 
       this.sendChunks();
     }
+  }
+
+  public get successfulPercentage() {
+    return this.nextChunkRangeStart / this.file.size;
   }
 
   /**
@@ -401,8 +420,14 @@ export class UpChunk {
     if (!(this.file instanceof File)) {
       throw new TypeError('file must be a File object');
     }
-    if (this.headers && typeof this.headers !== 'function' && typeof this.headers !== 'object') {
-      throw new TypeError('headers must be null, an object, or a function that returns an object or a promise');
+    if (
+      this.headers &&
+      typeof this.headers !== 'function' &&
+      typeof this.headers !== 'object'
+    ) {
+      throw new TypeError(
+        'headers must be null, an object, or a function that returns an object or a promise'
+      );
     }
     if (
       !isValidChunkSize(this.chunkSize, {
@@ -478,18 +503,19 @@ export class UpChunk {
     const beforeSend = (xhrObject: XMLHttpRequest) => {
       xhrObject.upload.onprogress = (event: ProgressEvent) => {
         const remainingChunks = this.totalChunks - this.chunkCount;
-        // const remainingBytes = this.file.size-(this.nextChunkRangeStart+event.loaded);
         const percentagePerChunk =
           (this.file.size - this.nextChunkRangeStart) /
           this.file.size /
           remainingChunks;
-        const successfulPercentage = this.nextChunkRangeStart / this.file.size;
         const currentChunkProgress =
           event.loaded / (event.total ?? this.chunkByteSize);
         const chunkPercentage = currentChunkProgress * percentagePerChunk;
+        // NOTE: Since progress events are "eager" and do not (yet) have sufficient context
+        // to "know" if the request was e.g. successful, we need to "recompute"/"rewind"
+        // progress if/when we detect failures. See failedChunkUploadCb(), below. (CJP)
         this.dispatch(
           'progress',
-          Math.min((successfulPercentage + chunkPercentage) * 100, 100)
+          Math.min((this.successfulPercentage + chunkPercentage) * 100, 100)
         );
       };
     };
@@ -497,6 +523,9 @@ export class UpChunk {
     return new Promise((resolve, reject) => {
       this.currentXhr = xhr({ ...options, beforeSend }, (err, resp) => {
         this.currentXhr = undefined;
+        // NOTE: For at least some `err` cases, resp will still carry information. We may want to consider passing that on somehow
+        // in our Promise reject (or instead of err) (CJP)
+        // See: https://github.com/naugtur/xhr/blob/master/index.js#L93-L100
         if (err) {
           return reject(err);
         }
@@ -512,7 +541,9 @@ export class UpChunk {
   protected async sendChunk(chunk: Blob) {
     const rangeStart = this.nextChunkRangeStart;
     const rangeEnd = rangeStart + chunk.size - 1;
-    const extraHeaders = await (typeof this.headers === 'function' ? this.headers() : this.headers);
+    const extraHeaders = await (typeof this.headers === 'function'
+      ? this.headers()
+      : this.headers);
 
     const headers = {
       ...extraHeaders,
@@ -574,12 +605,11 @@ export class UpChunk {
     };
 
     // What to do if a chunk upload failed, potentially after retries
-    const failedChunkUploadCb = async (res: XhrResponse, _chunk?: Blob) => {
+    const failedChunkUploadCb = async (res: XhrResponseLike, _chunk?: Blob) => {
+      this.dispatch('progress', Math.min(this.successfulPercentage * 100, 100));
       // Side effects
       this.dispatch('error', {
-        message: `Server responded with ${
-          (res as XhrResponse).statusCode
-        }. Stopping upload.`,
+        message: `Server responded with ${res.statusCode}. Stopping upload.`,
         chunk: this.chunkCount,
         attempts: this.attemptCount,
         response: res,
@@ -591,7 +621,7 @@ export class UpChunk {
     // What to do if a chunk upload failed but is retriable and hasn't exceeded retry
     // count
     const retriableChunkUploadCb = async (
-      res: XhrResponse | undefined,
+      res: XhrResponseLike | undefined,
       _chunk?: Blob
     ) => {
       // Side effects
@@ -620,13 +650,16 @@ export class UpChunk {
       });
     };
 
-    let res: XhrResponse | undefined;
+    let res: XhrResponseLike | undefined;
     try {
       this.attemptCount = this.attemptCount + 1;
       this.lastChunkStart = new Date();
       res = await this.sendChunk(chunk);
-    } catch (_err) {
-      // this type of error can happen after network disconnection on CORS setup
+    } catch (err: unknown) {
+      // Account for failed attempts due to becoming offline while making a request.
+      if (typeof (err as any)?.statusCode === 'number') {
+        res = err as XhrResponseLike;
+      }
     }
     const options = {
       retryCodes: this.retryCodes,
@@ -653,7 +686,8 @@ export class UpChunk {
    */
   private async sendChunks() {
     // A "pending chunk" is a chunk that was unsuccessful but still retriable when
-    // uploading was _paused or the env is offline. Since this may be the last
+    // uploading was _paused or the env is offline. Since this may be the last chunk,
+    // we account for it outside of the loop.
     if (this.pendingChunk && !(this._paused || this.offline)) {
       const chunk = this.pendingChunk;
       this.pendingChunk = undefined;
