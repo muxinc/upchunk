@@ -56,6 +56,7 @@ export type ChunkedStreamIterableOptions = {
 export class ChunkedStreamIterable implements AsyncIterable<Blob> {
   protected _chunkSize: number | undefined;
   protected defaultChunkSize: number;
+  protected _error: Error | undefined;
   public readonly minChunkSize: number;
   public readonly maxChunkSize: number;
 
@@ -84,6 +85,10 @@ export class ChunkedStreamIterable implements AsyncIterable<Blob> {
 
   get chunkByteSize() {
     return this.chunkSize * 1024;
+  }
+
+  get error() {
+    return this._error;
   }
 
   async *[Symbol.asyncIterator](): AsyncIterator<Blob> {
@@ -129,6 +134,9 @@ export class ChunkedStreamIterable implements AsyncIterable<Blob> {
           }
         }
       }
+    } catch (e) {
+      // There are edge case errors when attempting to read() from ReadableStream reader.
+      this._error = e;
     } finally {
       // Last chunk, if any bits remain
       if (chunk) {
@@ -704,6 +712,11 @@ export class UpChunk {
       let chunkUploadSuccess = !chunk && done;
       if (chunk) {
         chunkUploadSuccess = await this.sendChunkWithRetries(chunk);
+      }
+
+      if (this.chunkedStreamIterable.error) {
+        this.dispatch('error', { message: `Unable to read file of size ${this.file.size} bytes. Try loading from another browser.` });
+        chunkUploadSuccess = false;
       }
       // NOTE: Need to disambiguate "last chunk to upload" (done) vs. "successfully"
       // uploaded last chunk to upload" (depends on status of sendChunkWithRetries),
