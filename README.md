@@ -51,7 +51,7 @@ You'll need to have a route in your application that returns an upload URL from 
 const Mux = require('@mux/mux-node');
 const mux = new Mux({
   tokenId: process.env.MUX_TOKEN_ID,
-  tokenSecret: process.env.MUX_TOKEN_SECRET
+  tokenSecret: process.env.MUX_TOKEN_SECRET,
 });
 
 module.exports = async (req, res) => {
@@ -79,7 +79,7 @@ const picker = document.getElementById('picker');
 
 picker.onchange = () => {
   const getUploadUrl = () =>
-    fetch('/the-endpoint-above').then(res =>
+    fetch('/the-endpoint-above').then((res) =>
       res.ok ? res.text() : throw new Error('Error getting an upload URL :(')
     );
 
@@ -90,11 +90,11 @@ picker.onchange = () => {
   });
 
   // subscribe to events
-  upload.on('error', err => {
+  upload.on('error', (err) => {
     console.error('💥 🙀', err.detail);
   });
 
-  upload.on('progress', progress => {
+  upload.on('progress', (progress) => {
     console.log(`So far we've uploaded ${progress.detail}% of this file.`);
   });
 
@@ -118,19 +118,19 @@ function Page() {
     try {
       const response = await fetch('/your-server-endpoint', { method: 'POST' });
       const url = await response.text();
-    
+
       const upload = UpChunk.createUpload({
         endpoint: url, // Authenticated url
         file: inputRef.files[0], // File object with your video file’s properties
         chunkSize: 30720, // Uploads the file in ~30 MB chunks
       });
-    
+
       // Subscribe to events
-      upload.on('error', error => {
+      upload.on('error', (error) => {
         setStatusMessage(error.detail);
       });
 
-      upload.on('progress', progress => {
+      upload.on('progress', (progress) => {
         setProgress(progress.detail);
       });
 
@@ -140,20 +140,23 @@ function Page() {
     } catch (error) {
       setErrorMessage(error);
     }
-  }
+  };
 
   return (
     <div className="page-container">
       <h1>File upload button</h1>
       <label htmlFor="file-picker">Select a video file:</label>
-      <input type="file" onChange={(e) => handleUpload(e.target)}
-        id="file-picker" name="file-picker"/ >
+      <input
+        type="file"
+        onChange={(e) => handleUpload(e.target)}
+        id="file-picker"
+        name="file-picker"
+      />
 
       <label htmlFor="upload-progress">Downloading progress:</label>
-      <progress value={progress} max="100"/>
-      
+      <progress value={progress} max="100" />
+
       <em>{statusMessage}</em>
-        
     </div>
   );
 }
@@ -169,7 +172,7 @@ Returns an instance of `UpChunk` and begins uploading the specified `File`.
 
 #### `options` object parameters
 
-- `endpoint` <small>type: `string` | `function` (required)</small>
+- `endpoint` <small>type: `string` (url) | `function` (required)</small>
 
   URL to upload the file to. This can be either a string of the authenticated URL to upload to, or a function that returns a promise that resolves that URL string. The function will be passed the `file` as a parameter.
 
@@ -181,7 +184,7 @@ Returns an instance of `UpChunk` and begins uploading the specified `File`.
 
   An object, a function that returns an object, or a function that returns a promise of an object. The resulting object contains any headers you'd like included with the `PUT` request for each chunk.
 
-- `chunkSize` <small>type: `integer`, default:`30720`</small>
+- `chunkSize` <small>type: `integer` (kB), default:`30720`</small>
 
   The size in kB of the chunks to split the file into, with the exception of the final chunk which may be smaller. This parameter must be in multiples of 256.
 
@@ -191,11 +194,15 @@ Returns an instance of `UpChunk` and begins uploading the specified `File`.
 
 - `attempts` <small>type: `integer`, default: `5`</small>
 
-  The number of times to retry any given chunk.
+  The number of times to retry any given chunk if the upload attempt fails with a retriable response status (see: `retryCodes`, below). After attempting `attempts` times, an error event will be dispatched and uploading will halt.
 
-- `delayBeforeAttempt` <small>type: `integer`, default: `1`</small>
+- `delayBeforeAttempt` <small>type: `number` (seconds), default: `1.0`</small>
 
   The time in seconds to wait before attempting to upload a chunk again.
+
+- `retryCodes` <small>type: `number[]` (HTTP Status), default: `[408, 502, 503, 504]`</small>
+
+  The HTTP Status codes that indicate a given (failed) chunk upload request attempt is retriable. See also: `attempts` option, above.
 
 - `method` <small>type: `"PUT" | "PATCH" | "POST"`, default: `PUT`</small>
 
@@ -205,13 +212,27 @@ Returns an instance of `UpChunk` and begins uploading the specified `File`.
 
   Whether or not the system should dynamically scale the `chunkSize` up and down to adjust to network conditions.
 
-- `maxChunkSize` <small>type: `integer`, default: `512000`</small>
+- `maxChunkSize` <small>type: `integer` (kB), default: `512000`</small>
 
   When `dynamicChunkSize` is `true`, the largest chunk size that will be used, in kB.
 
-- `minChunkSize` <small>type: `integer`, default: `256`</small>
+- `minChunkSize` <small>type: `integer` (kB), default: `256`</small>
 
   When `dynamicChunkSize` is `true`, the smallest chunk size that will be used, in kB.
+
+- `useLargeFileWorkaround` <small>type: `boolean`, default: `false`</small>
+
+  Falls back to reading entire file into memory for cases where support for streams is unreliable (see, e.g. [this upchunk issue](https://github.com/muxinc/upchunk/issues/134) and the corresponding [webkit bug report](https://bugs.webkit.org/show_bug.cgi?id=272600)).
+
+### UpChunk Instance Properties
+
+- `offline` <small>type: `(readonly) boolean` default: `false`</small>
+
+  Indicates whether or not currently offline. While offline, uploading will pause and resume automatically once back online. See also: `offline` and `online` events, below.
+
+- `paused` <small>type: `(readonly) boolean` default: `false`</small>
+
+  Indicates whether or not uploading has been temporarily paused via the `pause()` method. See also: `pause()` and `resume()` methods, below.
 
 ### UpChunk Instance Methods
 
