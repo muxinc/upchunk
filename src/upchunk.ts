@@ -331,7 +331,7 @@ export interface UpChunkOptions {
   dynamicChunkSize?: boolean;
   maxChunkSize?: number;
   minChunkSize?: number;
-  useFileSliceFallback?: boolean;
+  useLargeFileWorkaround?: boolean;
 }
 
 export class UpChunk {
@@ -390,7 +390,7 @@ export class UpChunk {
     this.success = false;
     this.nextChunkRangeStart = 0;
 
-    if (options.useFileSliceFallback) {
+    if (options.useLargeFileWorkaround) {
       const readableStreamErrorCallback = (event: CustomEvent) => {
         // In this case, assume the error is a result of file reading via ReadableStream.
         // Retry using ChunkedFileIterable, which reads the file into memory instead
