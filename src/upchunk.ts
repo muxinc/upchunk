@@ -299,7 +299,10 @@ export const isIncompleteChunkUploadNeedingRetry = (
   }
 
   const endByte = parseInt(range[2], 10);
-  return endByte !== _options.currentChunkEndByte;
+  // NOTE: Since the endpoint may have been used previously and uploaded multiple chunks,
+  // only treat as an incomplete chunk upload if the end byte from the response header is
+  // less than the current chunk's end byte.
+  return endByte < _options.currentChunkEndByte;
 };
 
 type EventName =
