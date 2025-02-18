@@ -306,12 +306,12 @@ describe('integration', () => {
     });
 
     const upload = createUploadFixture({
-      headers: { 'Authorization': 'Bearer token' },
+      headers: { Authorization: 'Bearer token' },
     });
 
     upload.on('error', (err) => done(err));
     upload.on('success', () => {
-      expect(requestHeaders).to.include({ 'authorization': 'Bearer token' });
+      expect(requestHeaders).to.include({ authorization: 'Bearer token' });
       done();
     });
   });
@@ -324,12 +324,14 @@ describe('integration', () => {
     });
 
     const upload = createUploadFixture({
-      headers: () => { return { 'Authorization': 'Bearer token' } },
+      headers: () => {
+        return { Authorization: 'Bearer token' };
+      },
     });
 
     upload.on('error', (err) => done(err));
     upload.on('success', () => {
-      expect(requestHeaders).to.include({ 'authorization': 'Bearer token' });
+      expect(requestHeaders).to.include({ authorization: 'Bearer token' });
       done();
     });
   });
@@ -342,12 +344,12 @@ describe('integration', () => {
     });
 
     const upload = createUploadFixture({
-      headers: () => Promise.resolve({ 'Authorization': 'Bearer token' }),
+      headers: () => Promise.resolve({ Authorization: 'Bearer token' }),
     });
 
     upload.on('error', (err) => done(err));
     upload.on('success', () => {
-      expect(requestHeaders).to.include({ 'authorization': 'Bearer token' });
+      expect(requestHeaders).to.include({ authorization: 'Bearer token' });
       done();
     });
   });
@@ -453,7 +455,7 @@ describe('integration', () => {
             setTimeout(() => {
               upload.resume();
             }, 50);
-          })
+          });
         }
         return res.status(200);
       });
@@ -490,6 +492,42 @@ describe('integration', () => {
         );
         done();
       });
+    });
+  });
+});
+
+describe('endpoint error handling', () => {
+  it('throws an error if endpoint function does not return a string', (done) => {
+    const upload = createUploadFixture({
+      endpoint: () => Promise.resolve(123 as any),
+    });
+
+    upload.on('error', (err) => {
+      expect(err.detail.message).to.include('Failed to get endpoint');
+      done();
+    });
+
+    upload.on('success', () => {
+      done(
+        new Error('Expected upload to fail due to invalid endpoint return type')
+      );
+    });
+  });
+
+  it('throws an error if endpoint function throws an error', (done) => {
+    const upload = createUploadFixture({
+      endpoint: () => Promise.reject(new Error('Endpoint error')),
+    });
+
+    upload.on('error', (err) => {
+      expect(err.detail.message).to.include(
+        'Failed to get endpoint: Endpoint error'
+      );
+      done();
+    });
+
+    upload.on('success', () => {
+      done(new Error('Expected upload to fail due to endpoint function error'));
     });
   });
 });
