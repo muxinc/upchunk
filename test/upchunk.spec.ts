@@ -492,40 +492,37 @@ describe('integration', () => {
       });
     });
   });
-});
 
-describe('endpoint error handling', () => {
-  it('throws an error if endpoint function does not return a string', (done) => {
-    const upload = createUploadFixture({
-      endpoint: () => Promise.resolve(123 as any),
+  describe('endpoint promise error handling', () => {
+    it('dispatches an error if the endpoint promise fails', (done) => {
+      const upload = createUploadFixture({
+        endpoint: () => Promise.reject(new Error('Endpoint fetch failed')),
+      });
+
+      upload.on('error', (err) => {
+        expect(err.detail.message).to.include('Failed to get endpoint: Endpoint fetch failed');
+        done();
+      });
+
+      upload.on('success', () => {
+        done(new Error('Expected an error, but upload succeeded'));
+      });
     });
 
-    upload.on('error', (err) => {
-      expect(err.detail.message).to.include('Failed to get endpoint');
-      done();
-    });
+    it('dispatches an error if the endpoint promise does not return a string', (done) => {
+      const upload = createUploadFixture({
+        // @ts-expect-error we're testing this case
+        endpoint: () => Promise.resolve(12345),
+      });
 
-    upload.on('success', () => {
-      done(
-        new Error('Expected upload to fail due to invalid endpoint return type')
-      );
-    });
-  });
+      upload.on('error', (err) => {
+        expect(err.detail.message).to.include('Failed to get endpoint');
+        done();
+      });
 
-  it('throws an error if endpoint function throws an error', (done) => {
-    const upload = createUploadFixture({
-      endpoint: () => Promise.reject(new Error('Endpoint error')),
-    });
-
-    upload.on('error', (err) => {
-      expect(err.detail.message).to.include(
-        'Failed to get endpoint: Endpoint error'
-      );
-      done();
-    });
-
-    upload.on('success', () => {
-      done(new Error('Expected upload to fail due to endpoint function error'));
+      upload.on('success', () => {
+        done(new Error('Expected an error, but upload succeeded'));
+      });
     });
   });
 });
