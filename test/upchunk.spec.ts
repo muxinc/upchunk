@@ -306,12 +306,12 @@ describe('integration', () => {
     });
 
     const upload = createUploadFixture({
-      headers: { Authorization: 'Bearer token' },
+      headers: { 'Authorization': 'Bearer token' },
     });
 
     upload.on('error', (err) => done(err));
     upload.on('success', () => {
-      expect(requestHeaders).to.include({ authorization: 'Bearer token' });
+      expect(requestHeaders).to.include({ 'authorization': 'Bearer token' });
       done();
     });
   });
@@ -324,14 +324,12 @@ describe('integration', () => {
     });
 
     const upload = createUploadFixture({
-      headers: () => {
-        return { Authorization: 'Bearer token' };
-      },
+      headers: () => { return { 'Authorization': 'Bearer token' } },
     });
 
     upload.on('error', (err) => done(err));
     upload.on('success', () => {
-      expect(requestHeaders).to.include({ authorization: 'Bearer token' });
+      expect(requestHeaders).to.include({ 'authorization': 'Bearer token' });
       done();
     });
   });
@@ -344,12 +342,12 @@ describe('integration', () => {
     });
 
     const upload = createUploadFixture({
-      headers: () => Promise.resolve({ Authorization: 'Bearer token' }),
+      headers: () => Promise.resolve({ 'Authorization': 'Bearer token' }),
     });
 
     upload.on('error', (err) => done(err));
     upload.on('success', () => {
-      expect(requestHeaders).to.include({ authorization: 'Bearer token' });
+      expect(requestHeaders).to.include({ 'authorization': 'Bearer token' });
       done();
     });
   });
@@ -455,7 +453,7 @@ describe('integration', () => {
             setTimeout(() => {
               upload.resume();
             }, 50);
-          });
+          })
         }
         return res.status(200);
       });
