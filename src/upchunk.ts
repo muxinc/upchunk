@@ -411,9 +411,16 @@ export class UpChunk {
             defaultChunkSize: options.chunkSize,
           });
           this.chunkedIterator = this.chunkedIterable[Symbol.asyncIterator]();
-          this.getEndpoint().then(() => {
-            this.sendChunks();
-          });
+          this.getEndpoint()
+            .then(() => {
+              this.sendChunks();
+            })
+            .catch((e) => {
+              const message = e?.message ? `: ${e.message}` : '';
+              this.dispatch('error', {
+                message: `Failed to get endpoint${message}`,
+              });
+            });
           this.off('error', readableStreamErrorCallback);
         }
       };
@@ -433,7 +440,14 @@ export class UpChunk {
     this.totalChunks = Math.ceil(this.file.size / this.chunkByteSize);
     this.validateOptions();
 
-    this.getEndpoint().then(() => this.sendChunks());
+    this.getEndpoint()
+      .then(() => this.sendChunks())
+      .catch((e) => {
+        const message = e?.message ? `: ${e.message}` : '';
+        this.dispatch('error', {
+          message: `Failed to get endpoint${message}`,
+        });
+      });
 
     // restart sync when back online
     // trigger events when offline/back online
@@ -632,6 +646,9 @@ export class UpChunk {
 
     return this.endpoint(this.file).then((value) => {
       this.endpointValue = value;
+      if (typeof value !== 'string') {
+        throw new TypeError('endpoint must return a string');
+      }
       return this.endpointValue;
     });
   }

@@ -492,4 +492,37 @@ describe('integration', () => {
       });
     });
   });
+
+  describe('endpoint promise error handling', () => {
+    it('dispatches an error if the endpoint promise fails', (done) => {
+      const upload = createUploadFixture({
+        endpoint: () => Promise.reject(new Error('Endpoint fetch failed')),
+      });
+
+      upload.on('error', (err) => {
+        expect(err.detail.message).to.include('Failed to get endpoint: Endpoint fetch failed');
+        done();
+      });
+
+      upload.on('success', () => {
+        done(new Error('Expected an error, but upload succeeded'));
+      });
+    });
+
+    it('dispatches an error if the endpoint promise does not return a string', (done) => {
+      const upload = createUploadFixture({
+        // @ts-expect-error we're testing this case
+        endpoint: () => Promise.resolve(12345),
+      });
+
+      upload.on('error', (err) => {
+        expect(err.detail.message).to.include('Failed to get endpoint');
+        done();
+      });
+
+      upload.on('success', () => {
+        done(new Error('Expected an error, but upload succeeded'));
+      });
+    });
+  });
 });
