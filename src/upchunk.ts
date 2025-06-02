@@ -248,7 +248,7 @@ export class ChunkedFileIterable implements ChunkedIterable {
 }
 
 const SUCCESSFUL_CHUNK_UPLOAD_CODES = [200, 201, 202, 204, 308];
-const TEMPORARY_ERROR_CODES = [408, 502, 503, 504]; // These error codes imply a chunk may be retried
+const TEMPORARY_ERROR_CODES = [408, 502, 503, 504, 0]; // These error codes imply a chunk may be retried
 const RESUME_INCOMPLETE_CODES = [308];
 
 type UploadPredOptions = {
