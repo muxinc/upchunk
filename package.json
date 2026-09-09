@@ -93,7 +93,7 @@
       "optional": true
     }
   },
-  "volta": {
-    "node": "20.19.0"
+  "engines": {
+    "node": ">=22"
   }
 }
