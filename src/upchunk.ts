@@ -313,7 +313,9 @@ type EventName =
   | 'offline'
   | 'online'
   | 'progress'
-  | 'success';
+  | 'success'
+  | 'transcodeProgress'
+  | 'transcodeSuccess';
 
 // NOTE: This and the EventTarget definition below could be more precise
 // by e.g. typing the detail of the CustomEvent per EventName.
@@ -321,9 +323,56 @@ type UpchunkEvent = CustomEvent & Event<EventName>;
 
 type AllowedMethods = 'PUT' | 'POST' | 'PATCH';
 
-export interface UpChunkOptions {
-  endpoint: string | ((file?: File) => Promise<string>);
+export type TranscodeContext = {
+  signal: AbortSignal;
+  onProgress: (fraction: number) => void;
+};
+
+export type TranscodeResult = {
   file: File;
+  transcoded: boolean;
+  reasons?: string[];
+  error?: unknown;
+};
+
+export type TranscodeFn = (
+  file: File,
+  context: TranscodeContext
+) => Promise<TranscodeResult | File>;
+
+export type EndpointInfo = {
+  originalFile: File;
+  transcoded: boolean;
+  reasons?: string[];
+};
+
+export type EndpointFn = (file?: File, info?: EndpointInfo) => Promise<string>;
+
+const normalizeTranscodeResult = (
+  result: TranscodeResult | File,
+  originalFile: File
+): TranscodeResult => {
+  if (result instanceof File) {
+    return { file: result, transcoded: result !== originalFile };
+  }
+  if (!result || !(result.file instanceof File)) {
+    throw new TypeError(
+      'transcode must resolve to a File or an object with a File `file` property'
+    );
+  }
+  return {
+    ...result,
+    transcoded: result.transcoded ?? result.file !== originalFile,
+  };
+};
+
+const isAbortError = (error: unknown) =>
+  (error as { name?: string } | undefined)?.name === 'AbortError';
+
+export interface UpChunkOptions {
+  endpoint: string | EndpointFn;
+  file: File;
+  transcode?: TranscodeFn;
   method?: AllowedMethods;
   headers?: XhrHeaders | (() => XhrHeaders) | (() => Promise<XhrHeaders>);
   maxFileSize?: number;
@@ -342,18 +391,21 @@ export class UpChunk {
     return new UpChunk(options);
   }
 
-  public endpoint: string | ((file?: File) => Promise<string>);
+  public endpoint: string | EndpointFn;
   public file: File;
+  public readonly originalFile: File;
+  public transcode?: TranscodeFn;
   public headers: XhrHeaders | (() => XhrHeaders) | (() => Promise<XhrHeaders>);
   public method: AllowedMethods;
   public attempts: number;
   public delayBeforeAttempt: number;
   public retryCodes: number[];
   public dynamicChunkSize: boolean;
-  protected chunkedIterable: ChunkedIterable;
-  protected chunkedIterator;
+  protected chunkedIterable?: ChunkedIterable;
+  protected chunkedIterator?: AsyncIterator<Blob>;
 
   protected pendingChunk?: Blob;
+  private chunkOptions: ChunkedStreamIterableOptions;
   private chunkCount: number;
   private maxFileBytes: number;
   private endpointValue: string;
@@ -361,8 +413,11 @@ export class UpChunk {
   private attemptCount: number;
   private _offline: boolean;
   private _paused: boolean;
+  private _transcoding: boolean;
   private success: boolean;
   private currentXhr?: XMLHttpRequest;
+  private transcodeAbortController?: AbortController;
+  private transcodeInfo?: EndpointInfo;
   private lastChunkStart: Date;
   private nextChunkRangeStart: number;
 
@@ -373,6 +428,8 @@ export class UpChunk {
 
     this.endpoint = options.endpoint;
     this.file = options.file;
+    this.originalFile = options.file;
+    this.transcode = options.transcode;
 
     this.headers = options.headers || ({} as XhrHeaders);
     this.method = options.method || 'PUT';
@@ -380,6 +437,11 @@ export class UpChunk {
     this.delayBeforeAttempt = options.delayBeforeAttempt || 1;
     this.retryCodes = options.retryCodes || TEMPORARY_ERROR_CODES;
     this.dynamicChunkSize = options.dynamicChunkSize || false;
+    this.chunkOptions = {
+      defaultChunkSize: options.chunkSize,
+      minChunkSize: options.minChunkSize,
+      maxChunkSize: options.maxChunkSize,
+    };
 
     this.maxFileBytes = (options.maxFileSize || 0) * 1024;
     this.chunkCount = 0;
@@ -390,103 +452,74 @@ export class UpChunk {
     // 2. we're not online (as advertised by navigator.onLine)
     this._offline = typeof window !== 'undefined' && !window.navigator.onLine;
     this._paused = false;
+    this._transcoding = false;
     this.success = false;
     this.nextChunkRangeStart = 0;
 
-    if (options.useLargeFileWorkaround) {
-      const readableStreamErrorCallback = (event: CustomEvent) => {
-        // In this case, assume the error is a result of file reading via ReadableStream.
-        // Retry using ChunkedFileIterable, which reads the file into memory instead
-        // of a stream.
-        if (this.chunkedIterable.error) {
-          console.warn(
-            `Unable to read file of size ${this.file.size} bytes via a ReadableStream. Falling back to in-memory FileReader!`
-          );
-          event.stopImmediatePropagation();
-
-          // Re-set everything up with the fallback iterable and corresponding
-          // iterator
-          this.chunkedIterable = new ChunkedFileIterable(this.file, {
-            ...options,
-            defaultChunkSize: options.chunkSize,
-          });
-          this.chunkedIterator = this.chunkedIterable[Symbol.asyncIterator]();
-          this.getEndpoint()
-            .then(() => {
-              this.sendChunks();
-            })
-            .catch((e) => {
-              const message = e?.message ? `: ${e.message}` : '';
-              this.dispatch('error', {
-                message: `Failed to get endpoint${message}`,
-              });
-            });
-          this.off('error', readableStreamErrorCallback);
-        }
-      };
-      this.on('error', readableStreamErrorCallback);
-    }
-
-    // Types appear to be getting confused in env setup, using the overloaded NodeJS Blob definition, which uses NodeJS.ReadableStream instead
-    // of the DOM type definitions. For definitions, See consumers.d.ts vs. lib.dom.d.ts. (CJP)
-    this.chunkedIterable = new ChunkedStreamIterable(
-      this.file.stream() as unknown as ReadableStream<Uint8Array>,
-      { ...options, defaultChunkSize: options.chunkSize }
-    );
-    this.chunkedIterator = this.chunkedIterable[Symbol.asyncIterator]();
-
-    // NOTE: Since some of upchunk's properties defer "source of truth" to
-    // chunkedIterable, we need to do these after it's been created (CJP).
-    this.totalChunks = Math.ceil(this.file.size / this.chunkByteSize);
     this.validateOptions();
 
-    this.getEndpoint()
-      .then(() => this.sendChunks())
-      .catch((e) => {
-        const message = e?.message ? `: ${e.message}` : '';
-        this.dispatch('error', {
-          message: `Failed to get endpoint${message}`,
+    if (options.useLargeFileWorkaround) {
+      this.registerLargeFileWorkaround();
+    }
+    this.registerConnectivityListeners();
+
+    if (this.transcode) {
+      this.runTranscode(this.transcode)
+        .then((file) => {
+          this.initializeChunking(file);
+          this.startUpload();
+        })
+        .catch((e) => {
+          if (isAbortError(e)) return;
+          const message = e?.message ? `: ${e.message}` : '';
+          this.dispatch('error', {
+            message: `Transcode failed${message}`,
+            error: e,
+          });
         });
-      });
-
-    // restart sync when back online
-    // trigger events when offline/back online
-    if (typeof window !== 'undefined') {
-      window.addEventListener('online', () => {
-        if (!this.offline) return;
-
-        this._offline = false;
-        this.dispatch('online');
-        this.sendChunks();
-      });
-
-      window.addEventListener('offline', () => {
-        if (this.offline) return;
-
-        this._offline = true;
-        this.dispatch('offline');
-      });
+    } else {
+      this.initializeChunking(this.file);
+      this.startUpload();
     }
   }
 
   protected get maxChunkSize() {
-    return this.chunkedIterable?.maxChunkSize ?? DEFAULT_MAX_CHUNK_SIZE;
+    return (
+      this.chunkedIterable?.maxChunkSize ??
+      this.chunkOptions.maxChunkSize ??
+      DEFAULT_MAX_CHUNK_SIZE
+    );
   }
 
   protected get minChunkSize() {
-    return this.chunkedIterable?.minChunkSize ?? DEFAULT_MIN_CHUNK_SIZE;
+    return (
+      this.chunkedIterable?.minChunkSize ??
+      this.chunkOptions.minChunkSize ??
+      DEFAULT_MIN_CHUNK_SIZE
+    );
   }
 
   public get chunkSize() {
-    return this.chunkedIterable?.chunkSize ?? DEFAULT_CHUNK_SIZE;
+    return (
+      this.chunkedIterable?.chunkSize ??
+      this.chunkOptions.defaultChunkSize ??
+      DEFAULT_CHUNK_SIZE
+    );
   }
 
   public set chunkSize(value) {
-    this.chunkedIterable.chunkSize = value;
+    if (this.chunkedIterable) {
+      this.chunkedIterable.chunkSize = value;
+      return;
+    }
+    if (!isValidChunkSize(value, this.chunkOptions)) {
+      throw getChunkSizeError(value, this.chunkOptions);
+    }
+    this.chunkOptions.defaultChunkSize = value;
   }
 
   public get chunkByteSize() {
-    return this.chunkedIterable.chunkByteSize;
+    return this.chunkSize * 1024;
   }
 
   public get totalChunkSize() {
@@ -524,8 +557,13 @@ export class UpChunk {
     return this._paused;
   }
 
+  public get transcoding() {
+    return this._transcoding;
+  }
+
   public abort() {
     this.pause();
+    this.transcodeAbortController?.abort();
     this.currentXhr?.abort();
   }
 
@@ -537,7 +575,11 @@ export class UpChunk {
     if (this._paused) {
       this._paused = false;
 
-      this.sendChunks();
+      // While transcoding there is nothing to upload yet; the upload starts
+      // once the transcode resolves and honors the paused state then.
+      if (this.chunkedIterator) {
+        this.sendChunks();
+      }
     }
   }
 
@@ -570,6 +612,11 @@ export class UpChunk {
     }
     if (!(this.file instanceof File)) {
       throw new TypeError('file must be a File object');
+    }
+    if (this.transcode !== undefined && typeof this.transcode !== 'function') {
+      throw new TypeError(
+        'transcode must be undefined or a function that returns a promise'
+      );
     }
     if (
       this.headers &&
@@ -635,8 +682,121 @@ export class UpChunk {
     }
   }
 
+  private initializeChunking(file: File, strategy: 'stream' | 'file' = 'stream') {
+    this.file = file;
+    // Types appear to be getting confused in env setup, using the overloaded NodeJS Blob definition, which uses NodeJS.ReadableStream instead
+    // of the DOM type definitions. For definitions, See consumers.d.ts vs. lib.dom.d.ts. (CJP)
+    this.chunkedIterable =
+      strategy === 'file'
+        ? new ChunkedFileIterable(file, this.chunkOptions)
+        : new ChunkedStreamIterable(
+            file.stream() as unknown as ReadableStream<Uint8Array>,
+            this.chunkOptions
+          );
+    this.chunkedIterator = this.chunkedIterable[Symbol.asyncIterator]();
+    this.totalChunks = Math.ceil(file.size / this.chunkByteSize);
+  }
+
+  private startUpload() {
+    this.getEndpoint()
+      .then(() => this.sendChunks())
+      .catch((e) => {
+        const message = e?.message ? `: ${e.message}` : '';
+        this.dispatch('error', {
+          message: `Failed to get endpoint${message}`,
+        });
+      });
+  }
+
+  private async runTranscode(transcode: TranscodeFn): Promise<File> {
+    const controller = new AbortController();
+    this.transcodeAbortController = controller;
+    this._transcoding = true;
+
+    const onProgress = (fraction: number) => {
+      if (controller.signal.aborted) return;
+      const clamped = Math.min(Math.max(fraction, 0), 1);
+      this.dispatch('transcodeProgress', clamped * 100);
+    };
+
+    try {
+      const result = await transcode(this.originalFile, {
+        onProgress,
+        signal: controller.signal,
+      });
+      if (controller.signal.aborted) {
+        throw new DOMException('The transcode was aborted', 'AbortError');
+      }
+      const normalized = normalizeTranscodeResult(result, this.originalFile);
+      if (this.maxFileBytes > 0 && this.maxFileBytes < normalized.file.size) {
+        throw new Error(
+          `transcoded file size exceeds maximum (${normalized.file.size} > ${this.maxFileBytes})`
+        );
+      }
+      this.transcodeInfo = {
+        originalFile: this.originalFile,
+        transcoded: normalized.transcoded,
+        reasons: normalized.reasons,
+      };
+      this._transcoding = false;
+      this.transcodeAbortController = undefined;
+      this.dispatch('transcodeSuccess', {
+        ...normalized,
+        originalFile: this.originalFile,
+      });
+      return normalized.file;
+    } finally {
+      this._transcoding = false;
+      this.transcodeAbortController = undefined;
+    }
+  }
+
+  private registerLargeFileWorkaround() {
+    const readableStreamErrorCallback = (event: CustomEvent) => {
+      // In this case, assume the error is a result of file reading via ReadableStream.
+      // Retry using ChunkedFileIterable, which reads the file into memory instead
+      // of a stream.
+      if (this.chunkedIterable?.error) {
+        console.warn(
+          `Unable to read file of size ${this.file.size} bytes via a ReadableStream. Falling back to in-memory FileReader!`
+        );
+        event.stopImmediatePropagation();
+
+        this.initializeChunking(this.file, 'file');
+        this.startUpload();
+        this.off('error', readableStreamErrorCallback);
+      }
+    };
+    this.on('error', readableStreamErrorCallback);
+  }
+
+  // restart sync when back online
+  // trigger events when offline/back online
+  private registerConnectivityListeners() {
+    if (typeof window === 'undefined') return;
+
+    window.addEventListener('online', () => {
+      if (!this.offline) return;
+
+      this._offline = false;
+      this.dispatch('online');
+      if (this.chunkedIterator) {
+        this.sendChunks();
+      }
+    });
+
+    window.addEventListener('offline', () => {
+      if (this.offline) return;
+
+      this._offline = true;
+      this.dispatch('offline');
+    });
+  }
+
   /**
    * Endpoint can either be a URL or a function that returns a promise that resolves to a string.
+   * The function receives the file that will actually be uploaded (the transcoded file when
+   * a transcode step ran) along with details about the original file.
    */
   private getEndpoint() {
     if (typeof this.endpoint === 'string') {
@@ -644,7 +804,7 @@ export class UpChunk {
       return Promise.resolve(this.endpoint);
     }
 
-    return this.endpoint(this.file).then((value) => {
+    return this.endpoint(this.file, this.transcodeInfo).then((value) => {
       this.endpointValue = value;
       if (typeof value !== 'string') {
         throw new TypeError('endpoint must return a string');
@@ -839,6 +999,9 @@ export class UpChunk {
    * handle errors & retries and dispatch events
    */
   private async sendChunks() {
+    const chunkedIterator = this.chunkedIterator;
+    if (!chunkedIterator) return;
+
     // A "pending chunk" is a chunk that was unsuccessful but still retriable when
     // uploading was _paused or the env is offline. Since this may be the last chunk,
     // we account for it outside of the loop.
@@ -852,7 +1015,7 @@ export class UpChunk {
     }
 
     while (!(this.success || this._paused || this.offline)) {
-      const { value: chunk, done } = await this.chunkedIterator.next();
+      const { value: chunk, done } = await chunkedIterator.next();
       // NOTE: When `done`, `chunk` is undefined, so default `chunkUploadSuccess`
       // to be `true` on this condition, otherwise `false`.
       let chunkUploadSuccess = !chunk && done;
@@ -860,7 +1023,7 @@ export class UpChunk {
         chunkUploadSuccess = await this.sendChunkWithRetries(chunk);
       }
 
-      if (this.chunkedIterable.error) {
+      if (this.chunkedIterable?.error) {
         chunkUploadSuccess = false;
         this.dispatch('error', {
           message: `Unable to read file of size ${this.file.size} bytes. Try loading from another browser.`,

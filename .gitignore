@@ -2,3 +2,7 @@ node_modules
 dist
 test/dist
 mux-upchunk-v*.tgz
+example/upchunk.js
+example/upchunk.js.map
+example/upchunk-mediabunny.js
+example/upchunk-mediabunny.js.map

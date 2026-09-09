@@ -7,9 +7,26 @@
   "browser": "dist/upchunk.js",
   "unpkg": "dist/upchunk.js",
   "exports": {
-    "import": "./dist/upchunk.mjs",
-    "require": "./dist/upchunk.cjs.js",
-    "default": "./dist/upchunk.js"
+    ".": {
+      "types": "./dist/upchunk.d.ts",
+      "import": "./dist/upchunk.mjs",
+      "require": "./dist/upchunk.cjs.js",
+      "default": "./dist/upchunk.js"
+    },
+    "./mediabunny": {
+      "types": "./dist/mediabunny/index.d.ts",
+      "import": "./dist/mediabunny/index.mjs",
+      "require": "./dist/mediabunny/index.cjs.js",
+      "default": "./dist/mediabunny/index.mjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "typesVersions": {
+    "*": {
+      "mediabunny": [
+        "dist/mediabunny/index.d.ts"
+      ]
+    }
   },
   "types": "dist/upchunk.d.ts",
   "repository": "https://github.com/muxinc/upchunk",
@@ -35,13 +52,18 @@
     "lint": "tslint --project .",
     "tslint-check": "tslint-config-prettier-check ./tslint.json",
     "build:test": "esbuild ./test/deps/xhr-mock.ts ./test/deps/xhr.ts --target=es2019 --format=esm --bundle --minify --outdir=./test/dist --out-extension:.js=.mjs",
-    "start": "esbuild      src/upchunk.ts --target=es2019 --format=iife --bundle --sourcemap --outdir=./example --global-name=UpChunk --servedir=example",
+    "start:mediabunny": "esbuild src/mediabunny/index.ts --target=es2021 --format=iife --bundle --sourcemap --outfile=./example/upchunk-mediabunny.js --global-name=UpChunkMediabunny",
+    "start": "npm-run-all start:mediabunny start:core",
     "build:umd": "node ./esbuild-umd.mjs",
     "build:esm": "esbuild  src/upchunk.ts --target=es2019 --format=esm  --bundle --sourcemap --outdir=./dist --out-extension:.js=.mjs",
     "build:cjs": "esbuild  src/upchunk.ts --target=es2019 --format=cjs  --bundle --minify --sourcemap --outdir=./dist --out-extension:.js=.cjs.js",
+    "build:esm:mediabunny": "esbuild src/mediabunny/index.ts --target=es2021 --format=esm --bundle --sourcemap --external:mediabunny --outfile=./dist/mediabunny/index.mjs",
+    "build:cjs:mediabunny": "esbuild src/mediabunny/index.ts --target=es2021 --format=cjs --bundle --minify --sourcemap --external:mediabunny --outfile=./dist/mediabunny/index.cjs.js",
+    "build:iife:mediabunny": "esbuild src/mediabunny/index.ts --target=es2021 --format=iife --bundle --minify --sourcemap --legal-comments=linked --global-name=UpChunkMediabunny --outfile=./dist/upchunk-mediabunny.js",
     "build:types": "tsc --declaration --emitDeclarationOnly --outDir './dist'",
-    "build:all": "npm-run-all --parallel build:types build:esm build:cjs build:umd",
-    "build": "yarn clean && yarn lint && yarn build:all && yarn pack"
+    "build:all": "npm-run-all --parallel build:types build:esm build:cjs build:umd build:esm:mediabunny build:cjs:mediabunny build:iife:mediabunny",
+    "build": "yarn clean && yarn lint && yarn build:all && yarn pack",
+    "start:core": "esbuild src/upchunk.ts --target=es2019 --format=iife --bundle --sourcemap --outdir=./example --global-name=UpChunk --servedir=example"
   },
   "devDependencies": {
     "@open-wc/testing": "^3.1.6",
@@ -50,6 +72,7 @@
     "@web/test-runner": "^0.15.0",
     "esbuild": "^0.14.47",
     "esbuild-plugin-umd-wrapper": "^2.0.0",
+    "mediabunny": "^1.56.0",
     "npm-run-all": "^4.1.5",
     "rimraf": "^3.0.2",
     "tslint": "^6.1.2",
@@ -62,7 +85,15 @@
     "event-target-shim": "^6.0.2",
     "xhr": "^2.6.0"
   },
+  "peerDependencies": {
+    "mediabunny": "^1.56.0"
+  },
+  "peerDependenciesMeta": {
+    "mediabunny": {
+      "optional": true
+    }
+  },
   "volta": {
-    "node": "10.21.0"
+    "node": "20.19.0"
   }
 }

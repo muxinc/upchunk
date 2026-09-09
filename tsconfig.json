@@ -1,13 +1,14 @@
 {
   "compilerOptions": {
-    "target": "ES2019",
+    "target": "ES2021",
     "declaration": true,
     "declarationDir": "./dist",
     "noImplicitAny": true,
     "outDir": "./dist",
     "strictNullChecks": true,
+    "skipLibCheck": true,
     "moduleResolution": "node",
-    "lib": ["dom", "ES2016"]
+    "lib": ["dom", "dom.iterable", "ES2021"]
   },
   "include": ["src/**/*.ts"]
 }

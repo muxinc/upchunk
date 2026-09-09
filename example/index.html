@@ -8,13 +8,26 @@
 
   <body>
     <h1>Upload a video</h1>
+    <p><a href="/compare.html">Compare uploads with and without client-side transcoding</a></p>
 
     <div id="player-container" style="display:none;"></div>
 
     <input id="location" type="text" placeholder="Mux Upload URL" />
+    <label>
+      <input id="transcode" type="checkbox" />
+      Transcode to Mux standard input before uploading (mediabunny)
+    </label>
+    <label>
+      Max resolution tier
+      <select id="tier">
+        <option value="1080p" selected>1080p</option>
+        <option value="2160p">2160p</option>
+      </select>
+    </label>
     <input id="picker" type="file" />
 
     <script src="/upchunk.js"></script>
+    <script src="/upchunk-mediabunny.js"></script>
     <script src="https://unpkg.com/hls.js@0.11.0/dist/hls.js"></script>
     <script src="./script.js"></script>
   </body>
