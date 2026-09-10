@@ -359,7 +359,7 @@ To see the difference for yourself, run `yarn start` and open [`/compare.html`](
 - `maxResolutionTier` <small>`'1080p' | '2160p'`, default `'1080p'`</small>: match the `max_resolution_tier` of your Mux asset. Controls the resolution, bitrate, keyframe interval and frame rate limits applied.
 - `mode` <small>`'auto' | 'always'`, default `'auto'`</small>: `'always'` re-encodes every track even when the input already conforms.
 - `keyFrameInterval` <small>seconds, default `5`</small>: keyframe interval used when video is re-encoded.
-- `videoBitrate` <small>bits per second</small>: override the target video bitrate. By default the source bitrate is kept, capped at 85% of the tier limit and scaled with any downscale.
+- `videoBitrate` <small>bits per second</small>: override the target video bitrate. By default the measured source bitrate is kept (scaled up 1.3x to 1.5x when converting from VP9, HEVC or AV1, which H.264 cannot match bit for bit), capped at 85% of the tier limit and scaled with any downscale.
 - `hardwareAcceleration` <small>`'no-preference' | 'prefer-hardware' | 'prefer-software'`</small>: passed through to WebCodecs.
 - `audioFallback` <small>`'opus' | 'none'`, default `'opus'`</small>: what to do when the browser cannot encode AAC. See browser support below.
 - `fallbackToOriginal` <small>boolean, default `true`</small>: when transcoding fails or the browser lacks a usable encoder, upload the original file and report the failure in `transcodeSuccess` (`detail.notes` includes `transcode_failed_uploading_original` and `detail.error` carries the cause). Set to `false` to receive an `error` event instead.

@@ -14,7 +14,6 @@ import type {
   VideoTrackSummary,
 } from './types';
 
-const GOP_SCANNED_CODECS = ['avc', 'hevc'];
 const ABORT_CHECK_INTERVAL = 250;
 
 export const createAbortError = () =>
@@ -43,7 +42,7 @@ interface GopStats {
 
 // Single metadata-only pass over the packets to find the longest keyframe interval, the
 // peak per-GOP bitrate and the average bitrate. Stops early when the scan budget is spent.
-const scanGops = async (
+const scanPackets = async (
   track: InputVideoTrack,
   options: ResolvedMuxTranscoderOptions,
   signal: AbortSignal | undefined
@@ -119,14 +118,7 @@ const summarizeVideoTrack = async (
 ): Promise<VideoTrackSummary> => {
   const codec = await swallow(track.getCodec(), null);
   const frameRateMetrics = await swallow(track.computeFrameRateMetrics(), null);
-  const gop = GOP_SCANNED_CODECS.includes(codec ?? '')
-    ? await scanGops(track, options, signal)
-    : {
-        averageBitrate: null,
-        maxKeyFrameInterval: null,
-        maxGopBitrate: null,
-        complete: false,
-      };
+  const gop = await scanPackets(track, options, signal);
 
   return {
     codec,

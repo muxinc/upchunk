@@ -13,6 +13,16 @@ import type {
 export const MAX_DURATION_SECONDS = 12 * 60 * 60;
 const MIN_TARGET_BITRATE = 1e6;
 const BITRATE_HEADROOM = 0.85;
+// Rough bits-per-pixel-per-frame used to estimate a sane H.264 bitrate when the source
+// bitrate could not be measured.
+const FALLBACK_BITS_PER_PIXEL = 0.1;
+const FALLBACK_FRAME_RATE = 30;
+// H.264 needs more bits than these codecs for comparable quality.
+const CODEC_EFFICIENCY_VS_AVC: Record<string, number> = {
+  av1: 1.5,
+  hevc: 1.4,
+  vp9: 1.3,
+};
 const STANDARD_AUDIO_CHANNEL_COUNTS = [1, 2, 6];
 const STANDARD_VIDEO_CODECS = ['avc', 'hevc'];
 // 8-bit 4:2:0 AVC profiles: Baseline, Main, Extended, High
@@ -109,7 +119,11 @@ const chooseTargetBitrate = (
   const cap = limits.maxAverageBitrate * BITRATE_HEADROOM;
   const sourcePixels = Math.max(1, video.codedWidth * video.codedHeight);
   const pixelRatio = Math.min(1, (target.width * target.height) / sourcePixels);
-  const base = Math.min(video.averageBitrate ?? cap, cap);
+  const sourceBitrate =
+    video.averageBitrate ??
+    sourcePixels * (video.frameRate ?? FALLBACK_FRAME_RATE) * FALLBACK_BITS_PER_PIXEL;
+  const efficiency = CODEC_EFFICIENCY_VS_AVC[video.codec ?? ''] ?? 1;
+  const base = Math.min(sourceBitrate * efficiency, cap);
   return Math.round(
     Math.min(cap, Math.max(MIN_TARGET_BITRATE, base * pixelRatio))
   );

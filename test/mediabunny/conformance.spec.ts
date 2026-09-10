@@ -179,6 +179,24 @@ describe('analyzeMediaSummary', () => {
     expect(override.video[0].targetBitrate).to.equal(3e6);
   });
 
+  it('gives H.264 more bits when converting from a more efficient codec', () => {
+    const vp9 = analyze(summary({ video: [video({ codec: 'vp9', codecString: null, averageBitrate: 2e6 })] }));
+    expect(vp9.video[0].targetBitrate).to.equal(2.6e6);
+    const av1 = analyze(summary({ video: [video({ codec: 'av1', codecString: null, averageBitrate: 2e6 })] }));
+    expect(av1.video[0].targetBitrate).to.equal(3e6);
+    const avc = analyze(summary({ video: [video({ averageBitrate: 2e6, maxKeyFrameInterval: 25 })] }));
+    expect(avc.video[0].targetBitrate).to.equal(2e6);
+  });
+
+  it('estimates from resolution and frame rate when the source bitrate is unknown', () => {
+    const unknown = analyze(
+      summary({ video: [video({ codec: 'vp9', codecString: null, codedWidth: 1280, codedHeight: 720, frameRate: 30, averageBitrate: null })] })
+    );
+    // 1280 * 720 * 30 fps * 0.1 bits per pixel, times the VP9 efficiency factor
+    expect(unknown.video[0].targetBitrate).to.equal(Math.round(1280 * 720 * 30 * 0.1 * 1.3));
+    expect(unknown.video[0].targetBitrate).to.be.lessThan(8e6 * 0.85);
+  });
+
   it('caps high frame rates per tier and only reports very low ones', () => {
     const high = analyze(summary({ video: [video({ frameRate: 240 })] }));
     expect(high.video[0].reasons).to.deep.equal(['video_frame_rate']);
