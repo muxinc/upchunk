@@ -384,11 +384,12 @@ export class UpChunk {
     this.maxFileBytes = (options.maxFileSize || 0) * 1024;
     this.chunkCount = 0;
     this.attemptCount = 0;
-    // Initialize offline to the current offline state, where
-    // offline is false if
-    // 1. we're not running in the browser (aka window is undefined) -OR-
-    // 2. we're not online (as advertised by navigator.onLine)
-    this._offline = typeof window !== 'undefined' && !window.navigator.onLine;
+    // Do not snapshot navigator.onLine. That flag reports interface state, not
+    // reachability, and a false reading here parks sendChunks() with no events
+    // and no recovery (the only unblock is a window `online` event that never
+    // fires if the browser already thought it was offline). Connectivity
+    // changes are still handled by the online/offline listeners below.
+    this._offline = false;
     this._paused = false;
     this.success = false;
     this.nextChunkRangeStart = 0;

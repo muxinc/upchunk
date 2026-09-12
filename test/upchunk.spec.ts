@@ -493,6 +493,47 @@ describe('integration', () => {
     });
   });
 
+  describe('navigator.onLine false at construction', () => {
+    afterEach(() => {
+      delete (navigator as unknown as { onLine?: boolean }).onLine;
+    });
+
+    it('starts the upload even when navigator.onLine is false', (done) => {
+      Object.defineProperty(navigator, 'onLine', {
+        configurable: true,
+        get: () => false,
+      });
+
+      xhrMock.put(endpoint, { status: 200 });
+
+      const upload = createUploadFixture();
+      expect(upload.offline).to.be.false;
+
+      let finished = false;
+      const finish = (err?: unknown) => {
+        if (finished) return;
+        finished = true;
+        done(err);
+      };
+
+      upload.on('error', (err) => {
+        finish(err);
+      });
+
+      upload.on('success', () => {
+        finish();
+      });
+
+      setTimeout(() => {
+        finish(
+          new Error(
+            'Upload did not start while navigator.onLine was false'
+          )
+        );
+      }, 250);
+    });
+  });
+
   describe('endpoint promise error handling', () => {
     it('dispatches an error if the endpoint promise fails', (done) => {
       const upload = createUploadFixture({
