@@ -270,7 +270,7 @@ const isRetriableChunkUpload = (
 const isFailedChunkUpload = (
   res: XhrResponseLike | undefined,
   options: UploadPredOptions
-): res is XhrResponseLike => {
+): boolean => {
   return (
     options.attemptCount >= options.attempts ||
     !(isSuccessfulChunkUpload(res) || isRetriableChunkUpload(res, options))
@@ -759,11 +759,16 @@ export class UpChunk {
     };
 
     // What to do if a chunk upload failed, potentially after retries
-    const failedChunkUploadCb = async (res: XhrResponseLike, _chunk?: Blob) => {
+    const failedChunkUploadCb = async (
+      res: XhrResponseLike | undefined,
+      _chunk?: Blob
+    ) => {
       this.dispatch('progress', Math.min(this.successfulPercentage * 100, 100));
       // Side effects
       this.dispatch('error', {
-        message: `Server responded with ${res.statusCode}. Stopping upload.`,
+        message: res
+          ? `Server responded with ${res.statusCode}. Stopping upload.`
+          : 'Unable to connect to the server. Stopping upload.',
         chunk: this.chunkCount,
         attempts: this.attemptCount,
         response: res,

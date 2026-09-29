@@ -111,6 +111,29 @@ describe('integration', () => {
     });
   });
 
+  it('dispatches an error when the last attempt fails without a response', (done) => {
+    xhrMock.put(endpoint, { status: 200 });
+
+    // A rejecting headers function fails the attempt before a request is sent,
+    // so there is no response to report.
+    const upload = createUploadFixture({
+      attempts: 1,
+      headers: () => Promise.reject(new Error('token refresh failed')),
+    });
+
+    upload.on('error', (err) => {
+      expect(err.detail.message).to.equal(
+        'Unable to connect to the server. Stopping upload.'
+      );
+      expect(err.detail.response).to.be.undefined;
+      done();
+    });
+
+    upload.on('success', () => {
+      done('Ironic failure, should not have been successful');
+    });
+  });
+
   it('fires an attempt event before each attempt', (done) => {
     let ATTEMPT_COUNT = 0;
     const MAX_ATTEMPTS = 2; // because we set the chunk size to 256kb, half of our file size in bytes.
