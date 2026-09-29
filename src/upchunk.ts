@@ -362,6 +362,7 @@ export class UpChunk {
   private _offline: boolean;
   private _paused: boolean;
   private success: boolean;
+  private sendingChunks: boolean;
   private currentXhr?: XMLHttpRequest;
   private lastChunkStart: Date;
   private nextChunkRangeStart: number;
@@ -391,6 +392,7 @@ export class UpChunk {
     this._offline = typeof window !== 'undefined' && !window.navigator.onLine;
     this._paused = false;
     this.success = false;
+    this.sendingChunks = false;
     this.nextChunkRangeStart = 0;
 
     if (options.useLargeFileWorkaround) {
@@ -839,6 +841,22 @@ export class UpChunk {
    * handle errors & retries and dispatch events
    */
   private async sendChunks() {
+    // Only one loop may read from the iterator and advance `nextChunkRangeStart`
+    // at a time. A running loop re-checks `_paused`/`offline` between chunks, so
+    // it picks up the work itself when resume() or an `online` event arrives
+    // while a chunk is still in flight.
+    if (this.sendingChunks) {
+      return;
+    }
+    this.sendingChunks = true;
+    try {
+      await this.sendChunksLoop();
+    } finally {
+      this.sendingChunks = false;
+    }
+  }
+
+  private async sendChunksLoop() {
     // A "pending chunk" is a chunk that was unsuccessful but still retriable when
     // uploading was _paused or the env is offline. Since this may be the last chunk,
     // we account for it outside of the loop.
