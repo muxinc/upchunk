@@ -362,7 +362,7 @@ export class UpChunk {
   private _offline: boolean;
   private _paused: boolean;
   private success: boolean;
-  private sendingChunks: boolean;
+  private activeSendLoop?: object;
   private currentXhr?: XMLHttpRequest;
   private lastChunkStart: Date;
   private nextChunkRangeStart: number;
@@ -392,7 +392,6 @@ export class UpChunk {
     this._offline = typeof window !== 'undefined' && !window.navigator.onLine;
     this._paused = false;
     this.success = false;
-    this.sendingChunks = false;
     this.nextChunkRangeStart = 0;
 
     if (options.useLargeFileWorkaround) {
@@ -845,14 +844,19 @@ export class UpChunk {
     // at a time. A running loop re-checks `_paused`/`offline` between chunks, so
     // it picks up the work itself when resume() or an `online` event arrives
     // while a chunk is still in flight.
-    if (this.sendingChunks) {
+    if (this.activeSendLoop) {
       return;
     }
-    this.sendingChunks = true;
+    const thisLoop = {};
+    this.activeSendLoop = thisLoop;
     try {
       await this.sendChunksLoop();
     } finally {
-      this.sendingChunks = false;
+      // The loop may have released the guard itself (see below) and a new loop
+      // may already be running, which this one must not clear.
+      if (this.activeSendLoop === thisLoop) {
+        this.activeSendLoop = undefined;
+      }
     }
   }
 
@@ -880,6 +884,10 @@ export class UpChunk {
 
       if (this.chunkedIterable.error) {
         chunkUploadSuccess = false;
+        // Error listeners (e.g. the `useLargeFileWorkaround` fallback) may start
+        // a new loop, so release the guard before dispatching. This loop returns
+        // right after.
+        this.activeSendLoop = undefined;
         this.dispatch('error', {
           message: `Unable to read file of size ${this.file.size} bytes. Try loading from another browser.`,
         });

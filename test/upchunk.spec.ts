@@ -91,6 +91,23 @@ describe('integration', () => {
     });
   });
 
+  it('restarts with the in-memory fallback when the file stream errors and useLargeFileWorkaround is set', (done) => {
+    xhrMock.put(endpoint, { status: 200 });
+
+    const file = new File([new ArrayBuffer(524288)], 'test.mp4');
+    file.stream = () =>
+      new ReadableStream({
+        start(controller) {
+          controller.error(new Error('stream failed'));
+        },
+      });
+
+    const upload = createUploadFixture({ useLargeFileWorkaround: true }, file);
+
+    upload.on('error', (err) => done(new Error(err.detail.message)));
+    upload.on('success', () => done());
+  });
+
   it('files can be uploading using POST', (done) => {
     xhrMock.post(endpoint, { status: 200 });
 
