@@ -45,10 +45,10 @@ yarn add @mux/upchunk
 
 ### Getting an upload URL from Mux.
 
-You'll need to have a route in your application that returns an upload URL from Mux. If you're using the [Mux Node SDK](https://github.com/muxinc/mux-node-sdk), you might do something that looks like this.
+You'll need to have a route in your application that returns an upload URL from Mux. If you're using the [Mux TypeScript SDK](https://github.com/muxinc/mux-ts), you might do something that looks like this.
 
 ```javascript
-const Mux = require('@mux/mux-node');
+const Mux = require('@mux/ts');
 const mux = new Mux({
   tokenId: process.env.MUX_TOKEN_ID,
   tokenSecret: process.env.MUX_TOKEN_SECRET,
@@ -59,7 +59,7 @@ module.exports = async (req, res) => {
   const upload = await mux.video.uploads.create({
     cors_origin: 'https://your-app.com',
     new_asset_settings: {
-      playback_policy: ['public'],
+      playback_policies: ['public'],
     },
   });
 
