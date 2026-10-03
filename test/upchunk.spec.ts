@@ -33,6 +33,81 @@ describe('integration', () => {
     });
   };
 
+  // NOTE: Keep this first. It dispatches window offline/online events, which every
+  // UpChunk created earlier in the run (its listeners are never removed) also observes.
+  it('does not send one chunk\'s bytes under another chunk\'s Content-Range when going offline and online mid-request', (done) => {
+    const chunkBytes = 256 * 1024;
+    const totalChunks = 4;
+    const fileBytes = new Uint8Array(chunkBytes * totalChunks);
+    // Make every chunk's bytes distinguishable
+    for (let i = 0; i < totalChunks; i++) {
+      fileBytes.fill(i + 1, i * chunkBytes, (i + 1) * chunkBytes);
+    }
+    const requests: { rangeStart: number; firstByte: number }[] = [];
+    let flapped = false;
+
+    xhrMock.put(endpoint, (req, res) => {
+      const contentRange = req.header('Content-Range') as string;
+      const rangeStart = parseInt(contentRange.split(' ')[1], 10);
+      const body = req.body() as Blob;
+      const requestNumber = requests.length + 1;
+      requests.push({ rangeStart, firstByte: -1 });
+      const record = requests[requests.length - 1];
+      if (requestNumber === 2 && !flapped) {
+        flapped = true;
+        window.dispatchEvent(new Event('offline'));
+        window.dispatchEvent(new Event('online'));
+      }
+      return body.arrayBuffer().then((buffer) => {
+        record.firstByte = new Uint8Array(buffer)[0];
+        return new Promise((resolve) =>
+          setTimeout(() => resolve(res.status(200)), 20)
+        );
+      });
+    });
+
+    const upload = createUploadFixture(
+      { chunkSize: 256 },
+      new File([fileBytes], 'test.mp4')
+    );
+
+    upload.on('error', (err) => done(new Error(err.detail.message)));
+    upload.on('success', () => {
+      // Give any second, concurrent loop the chance to finish sending
+      setTimeout(() => {
+        try {
+          requests.forEach(({ rangeStart, firstByte }) => {
+            expect(firstByte).to.equal(
+              rangeStart / chunkBytes + 1,
+              `bytes sent under Content-Range start ${rangeStart} belong to a different chunk`
+            );
+          });
+          expect(requests.length).to.equal(totalChunks);
+          done();
+        } catch (e) {
+          done(e);
+        }
+      }, 200);
+    });
+  });
+
+  it('restarts with the in-memory fallback when the file stream errors and useLargeFileWorkaround is set', (done) => {
+    xhrMock.put(endpoint, { status: 200 });
+
+    const file = new File([new ArrayBuffer(524288)], 'test.mp4');
+    file.stream = () =>
+      new ReadableStream({
+        start(controller) {
+          controller.error(new Error('stream failed'));
+        },
+      });
+
+    const upload = createUploadFixture({ useLargeFileWorkaround: true }, file);
+
+    upload.on('error', (err) => done(new Error(err.detail.message)));
+    upload.on('success', () => done());
+  });
+
   it('files can be uploading using POST', (done) => {
     xhrMock.post(endpoint, { status: 200 });
 
