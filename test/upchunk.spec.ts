@@ -96,6 +96,74 @@ describe('integration', () => {
     });
   });
 
+  describe('useLargeFileWorkaround', () => {
+    const chunkSizeKb = 256;
+    const chunkByteSize = chunkSizeKb * 1024;
+
+    const fileWithStreamErrorAfter = (file: File, failAfterBytes: number) => {
+      let emittedBytes = 0;
+      Object.defineProperty(file, 'stream', {
+        configurable: true,
+        value: () =>
+          new ReadableStream<Uint8Array>({
+            pull(controller) {
+              if (emittedBytes >= failAfterBytes) {
+                controller.error(
+                  new TypeError('Failed to read from Blob stream')
+                );
+                return;
+              }
+              const nextSize = failAfterBytes - emittedBytes;
+              controller.enqueue(new Uint8Array(nextSize));
+              emittedBytes += nextSize;
+            },
+          }),
+      });
+      return file;
+    };
+
+    it('restarts Content-Range at byte 0 after ReadableStream fallback so the last chunk stays within the file', (done) => {
+      const fileBytes = chunkByteSize * 2;
+      const file = fileWithStreamErrorAfter(
+        new File([new ArrayBuffer(fileBytes)], 'test.mp4'),
+        chunkByteSize
+      );
+      const contentRanges: string[] = [];
+      xhrMock.put(endpoint, (req, res) => {
+        contentRanges.push(req.header('Content-range') as string);
+        return res.status(200);
+      });
+
+      const upload = createUploadFixture(
+        {
+          chunkSize: chunkSizeKb,
+          useLargeFileWorkaround: true,
+        },
+        file
+      );
+
+      upload.on('error', (err) => {
+        done(err);
+      });
+
+      upload.on('success', () => {
+        try {
+          // Stream path uploads the first chunk, then fallback re-reads the
+          // file from byte 0. Without resetting nextChunkRangeStart the last
+          // range would be bytes 524288-786431/524288.
+          expect(contentRanges).to.eql([
+            `bytes 0-${chunkByteSize - 1}/${fileBytes}`,
+            `bytes 0-${chunkByteSize - 1}/${fileBytes}`,
+            `bytes ${chunkByteSize}-${fileBytes - 1}/${fileBytes}`,
+          ]);
+          done();
+        } catch (err) {
+          done(err);
+        }
+      });
+    });
+  });
+
   it('an error is thrown if a request does not complete', (done) => {
     xhrMock.put(endpoint, { status: 500 });
 

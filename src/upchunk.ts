@@ -399,6 +399,9 @@ export class UpChunk {
         // Retry using ChunkedFileIterable, which reads the file into memory instead
         // of a stream.
         if (this.chunkedIterable.error) {
+          // ChunkedFileIterable always starts at byte 0. Keep Content-Range
+          // in sync so fallback does not resume from a stale offset.
+          this.nextChunkRangeStart = 0;
           console.warn(
             `Unable to read file of size ${this.file.size} bytes via a ReadableStream. Falling back to in-memory FileReader!`
           );
