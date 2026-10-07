@@ -116,6 +116,30 @@ describe('option validation', () => {
 
       expect(() => createUpload(params)).to.throw(Error);
     });
+
+    it('transcode is not a function', () => {
+      const params = buildParams({ transcode: 'nope' });
+
+      expect(() => createUpload(params)).to.throw(TypeError);
+    });
+  });
+
+  it('a failing transcode with useLargeFileWorkaround dispatches a single error', (done) => {
+    const upload = createUpload(
+      buildParams({
+        useLargeFileWorkaround: true,
+        transcode: () => Promise.reject(new Error('boom')),
+      })
+    );
+    let errors = 0;
+    upload.on('error', (err) => {
+      errors += 1;
+      expect(err.detail.message).to.equal('Transcode failed: boom');
+      setTimeout(() => {
+        expect(errors).to.equal(1);
+        done();
+      }, 20);
+    });
   });
 });
 

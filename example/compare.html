@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>UpChunk: with vs without client-side transcode</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #f6f6f7;
+        --card: #ffffff;
+        --ink: #1b1b1f;
+        --muted: #6b6b76;
+        --line: #e2e2e8;
+        --accent: #fa50b5;
+        --accent-2: #2a6df4;
+        --ok: #1f9d55;
+        --warn: #d97706;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #141418;
+          --card: #1e1e24;
+          --ink: #f1f1f4;
+          --muted: #9a9aa6;
+          --line: #2c2c34;
+        }
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font: 15px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        background: var(--bg);
+        color: var(--ink);
+      }
+      main { max-width: 1100px; margin: 0 auto; padding: 32px 20px 64px; }
+      h1 { font-size: 22px; margin: 0 0 4px; }
+      .lede { color: var(--muted); margin: 0 0 24px; }
+      .setup {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 14px 20px;
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 18px 20px;
+        margin-bottom: 20px;
+      }
+      .setup label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--muted); }
+      .setup input[type="text"], .setup select {
+        font: inherit;
+        padding: 8px 10px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: transparent;
+        color: var(--ink);
+      }
+      .setup .inline { flex-direction: row; align-items: center; gap: 8px; align-self: end; }
+      .actions { grid-column: 1 / -1; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+      button {
+        font: inherit;
+        font-weight: 600;
+        padding: 9px 16px;
+        border-radius: 6px;
+        border: 1px solid var(--line);
+        background: var(--card);
+        color: var(--ink);
+        cursor: pointer;
+      }
+      button.primary { background: var(--accent-2); border-color: var(--accent-2); color: #fff; }
+      button:disabled { opacity: 0.5; cursor: default; }
+      .hint { color: var(--muted); font-size: 13px; }
+      .columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; }
+      .card {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 18px 20px;
+        border-top: 4px solid var(--muted);
+      }
+      .card.with { border-top-color: var(--accent); }
+      .card.without { border-top-color: var(--accent-2); }
+      .card h2 { font-size: 16px; margin: 0 0 2px; }
+      .card .sub { color: var(--muted); font-size: 13px; margin-bottom: 14px; }
+      .status { font-weight: 600; margin-bottom: 10px; min-height: 1.4em; }
+      .status.ok { color: var(--ok); }
+      .status.warn { color: var(--warn); }
+      .bar { margin-bottom: 10px; }
+      .bar .label { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+      progress { width: 100%; height: 10px; accent-color: var(--accent-2); }
+      .with progress { accent-color: var(--accent); }
+      table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
+      td { padding: 5px 0; border-top: 1px solid var(--line); vertical-align: top; }
+      td:first-child { color: var(--muted); width: 42%; }
+      td.num { font-variant-numeric: tabular-nums; }
+      code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+      .tag { display: inline-block; padding: 1px 7px; border-radius: 999px; background: var(--line); font-size: 12px; margin: 0 4px 4px 0; }
+      details { margin-top: 12px; font-size: 13px; }
+      pre { max-height: 260px; overflow: auto; background: var(--bg); padding: 10px; border-radius: 6px; font-size: 12px; }
+      .verdict { margin-top: 20px; padding: 14px 18px; border-radius: 10px; background: var(--card); border: 1px solid var(--line); }
+      .verdict strong { font-size: 15px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>UpChunk: with vs without client-side transcode</h1>
+      <p class="lede">
+        Uploads the same file twice, once as-is and once through <code>createMuxTranscoder()</code>, and shows what changed.
+        Direct upload URLs are single use, so you need one per side. Compare the resulting assets in the Mux dashboard:
+        the transcoded one should have no <code>non_standard_input_reasons</code> and reach <code>ready</code> sooner.
+      </p>
+
+      <section class="setup">
+        <label>File <input id="file" type="file" accept="video/*,audio/*,.mkv,.webm,.mov,.mp4" /></label>
+        <label>Max resolution tier
+          <select id="tier"><option value="1080p" selected>1080p</option><option value="2160p">2160p</option></select>
+        </label>
+        <label>Upload URL, without transcode <input id="url-without" type="text" placeholder="https://storage.googleapis.com/video-storage-..." /></label>
+        <label>Upload URL, with transcode <input id="url-with" type="text" placeholder="https://storage.googleapis.com/video-storage-..." /></label>
+        <label class="inline"><input id="parallel" type="checkbox" checked /> Run both sides at the same time</label>
+        <label class="inline"><input id="always" type="checkbox" /> Force transcode even when the file already conforms</label>
+        <div class="actions">
+          <button id="analyze">Analyze only</button>
+          <button id="run" class="primary">Run comparison</button>
+          <button id="cancel" disabled>Cancel</button>
+          <span id="setup-hint" class="hint">Leave a URL empty to skip that side.</span>
+        </div>
+      </section>
+
+      <section class="columns">
+        <article class="card without" id="card-without">
+          <h2>Without transcode</h2>
+          <div class="sub">Original file, straight to Mux</div>
+          <div class="status" data-role="status">Idle</div>
+          <div class="bar"><div class="label"><span>Upload</span><span data-role="upload-pct">0%</span></div><progress data-role="upload" max="100" value="0"></progress></div>
+          <table data-role="stats"></table>
+        </article>
+        <article class="card with" id="card-with">
+          <h2>With transcode</h2>
+          <div class="sub">Inspected and, if needed, rewritten to H.264/AAC MP4 first</div>
+          <div class="status" data-role="status">Idle</div>
+          <div class="bar"><div class="label"><span>Transcode</span><span data-role="transcode-pct">0%</span></div><progress data-role="transcode" max="100" value="0"></progress></div>
+          <div class="bar"><div class="label"><span>Upload</span><span data-role="upload-pct">0%</span></div><progress data-role="upload" max="100" value="0"></progress></div>
+          <table data-role="stats"></table>
+          <details><summary>Conformance report</summary><pre data-role="report">Run the comparison or click Analyze only.</pre></details>
+        </article>
+      </section>
+
+      <section class="verdict" id="verdict" hidden></section>
+    </main>
+
+    <script src="/upchunk.js"></script>
+    <script src="/upchunk-mediabunny.js"></script>
+    <script src="./compare.js"></script>
+  </body>
+</html>
